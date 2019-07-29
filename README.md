@@ -94,7 +94,7 @@ model.compile(loss="sparse_categorical_crossentropy",
 BERT has a large number of parameters (110M or 330M), which makes it important to reduce the communication overhead when synchronizing between workers by using a library such as [**Horovod**](https://github.com/horovod/horovod). Horovod uses NCCL (NVIDIA Collective Communications Library) which provides optimized implementation of inter-GPU communication operations, which can leverage the high-performance NVLINK or NVSWITCH interconnect between GPUs. We can get extremely good scaling efficiency (96%) when using Horovod.
 
 <p align="center">
-  <img src="https://github.com/NVAITC/examples/blob/master/bert_finetune/images/bert_scaling.jpg" width="80%">
+  <img src="https://raw.githubusercontent.com/NVAITC/bert-finetune/master/images/bert_scaling.jpg" width="80%">
 </p>
 
 >If you are new to Horovod or distributed training, please view:
