@@ -141,8 +141,10 @@ else:
     H_SIZE = 768
 
 if args.batch_size:
+    # use provided batch size
     BATCH_SIZE = args.batch_size
 else:
+    # use pre-determined batch size for current task
     if utils.get_gpu_vram() > 17000:
         if args.bertlarge:
             BATCH_SIZE = 36
@@ -191,9 +193,13 @@ if num_classes > 120:
     num_classes = ((num_classes//8)+1)*8
     print("\n[INFO  ] Padded number of classes:", num_classes, "\n")
 
-train_feat_cache = "./cache/train_feat.pickle."+str(hvd.rank())
+# load, preprocess and save data to pickle
 
+# training set
+
+train_feat_cache = "./cache/train_feat.pickle."+str(hvd.rank())
 train_feat = Path(train_feat_cache)
+
 if train_feat.is_file():
     feat = pickle.load(open(train_feat_cache, "rb"))
 else:
@@ -214,6 +220,7 @@ train_input_ids, train_input_masks, train_segment_ids, train_labels = shuffle(tr
                                                                               train_labels)
 
 if args.dev:
+    # for quicker testing during development, we reduce the dataset size
     num_items = len(train_labels)//4
     train_input_ids, train_input_masks = train_input_ids[:num_items], train_input_masks[:num_items]
     train_segment_ids, train_labels = train_segment_ids[:num_items], train_labels[:num_items]
@@ -221,8 +228,8 @@ if args.dev:
 # test set
 
 test_feat_cache = "./cache/test_feat.pickle."+str(hvd.rank())
-
 test_feat = Path(test_feat_cache)
+
 if test_feat.is_file():
     feat = pickle.load(open(test_feat_cache, "rb"))
 else:
@@ -281,7 +288,8 @@ else:
 if args.lr:
     LEARNING_RATE = args.lr
 else:
-    LEARNING_RATE = 2e-5 * hvd.size()
+    # scale LR by sqrt of number of workers
+    LEARNING_RATE = 2e-5 * (hvd.size() ** 0.5)
     
 opt = tf.keras.optimizers.Adam(lr=LEARNING_RATE, decay=0.0)
 
@@ -293,7 +301,6 @@ opt = hvd_keras.DistributedOptimizer(opt,
                                      sparse_as_dense=args.sparse_as_dense)
 
 if args.amp:
-    #opt = tf.train.experimental.enable_mixed_precision_graph_rewrite(opt)
     opt = tf.keras.mixed_precision.experimental.LossScaleOptimizer(opt, "dynamic")
 
 if WEIGHTS_PATH:
@@ -326,8 +333,6 @@ sess.run(tf.tables_initializer())
 tf.keras.backend.set_session(sess)
 
 # Broadcast initial variable states from rank 0 to all other processes:
-# This is necessary to ensure consistent initialization of all workers when
-# training is started with random weights or restored from a checkpoint.
 
 bcast = hvd.broadcast_global_variables(0)
 bcast.run(session=sess)

@@ -36,6 +36,7 @@ def load_ag_news_dataset(max_seq_len=512, test=False, augment=False):
     except Exception as e:
         print("Encounter weird pandas race condition", e)
         time.sleep(1)
+        print("Attempting to read data again")
         if test:
             df = pd.read_csv(dataset_path+"/test.csv",
                              names=["label", "title", "article"], header=None)

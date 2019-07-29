@@ -2,7 +2,7 @@
 
 **[BERT](https://arxiv.org/abs/1810.04805)** (Bidirectional Encoder Representations from Transformers) is a state-of-the-art NLP language model. BERT achieves state-of-the-art performance on a wide range of NLP tasks without any task specific architecture. Hence, we can fine-tune BERT or even combine it with other layers to create novel architectures. Since BERT is a large model, we require scaled-up training to iterate swiftly and enable productive experimentation.
 
-In this repository, we provide a performance-optimized examples for training BERT at a single-node, multi-gpu scale. We explain how we deliver up to 3.6x performance improvement on a DGX-1V with V100 (16GB) on BERT finetuning tasks.
+In this repository, we provide a performance-optimized examples for training BERT at a single-node, multi-gpu scale. We explain how we deliver more than 3x performance improvement (over a baseline implementation) on a DGX-1V with V100 on BERT finetuning tasks for both BERTBASE and BERTLARGE.
 
 ![header](images/bert_header.jpg)
 
@@ -57,8 +57,8 @@ Note that there are two main variants of the BERT model described in the paper a
 By enabling performance features such as the [XLA](https://www.tensorflow.org/xla/overview) compiler and [Automatic Mixed Precision (AMP)](https://developer.nvidia.com/automatic-mixed-precision), we can get a performance improvement of about 3x on a DGX-1V system when training BERT.
 
 <p align="center">
-  <img src="https://github.com/NVAITC/examples/blob/master/bert_finetune/images/bertbase_perf.jpg" width="48%">
-  <img src="https://github.com/NVAITC/examples/blob/master/bert_finetune/images/bertlarge_perf.jpg" width="48%">
+  <img src="https://raw.githubusercontent.com/NVAITC/bert-finetune/master/images/bertbase_perf.jpg" width="48%">
+  <img src="https://raw.githubusercontent.com/NVAITC/bert-finetune/master/images/bertlarge_perf.jpg" width="48%">
 </p>
 
 Note that these benchmarks are run production DGX-1 on Max-Q (power efficiency) and hence are not formal guarantees of performance (your numbers will likely be about 20-30% higher). 
@@ -115,8 +115,8 @@ optimizer = hvd_keras.DistributedOptimizer(optimizer,
 The performance increase for BERTLARGE is much less since the Embedding layer is less than half as large (9% in BERTLARGE vs 21% in BERTBASE).
 
 <p align="center">
-  <img src="https://github.com/NVAITC/examples/blob/master/bert_finetune/images/bertbase_params.jpg" width="48%">
-  <img src="https://github.com/NVAITC/examples/blob/master/bert_finetune/images/bertlarge_params.jpg" width="48%">
+  <img src="https://raw.githubusercontent.com/NVAITC/bert-finetune/master/images/bertbase_params.jpg" width="48%">
+  <img src="https://raw.githubusercontent.com/NVAITC/bert-finetune/master/images/bertlarge_params.jpg" width="48%">
 </p>
 
 
