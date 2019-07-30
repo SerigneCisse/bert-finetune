@@ -12,5 +12,5 @@ mpirun -np $N_GPU -H localhost:$N_GPU \
     -mca pml ob1 -mca btl ^openib \
     python3 news_classification.py \
     --xla --amp --sparse_as_dense --fp16_allreduce \
-    --epochs 5 --bertlarge --progress
+    --epochs 10 --bertlarge --progress
     

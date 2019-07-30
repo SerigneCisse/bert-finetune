@@ -155,12 +155,14 @@ bash -c 'export N_GPU=8 && git clone --depth 1 https://github.com/nvaitc/example
 | Model      | Params | Test Acc |
 | ---------- | ------ | -------- |
 | XLNet      | 330M   | 0.955    |
-| BERTLARGE  | 330M   | 0.947    |
-| BERTBASE   | 110M   | 0.939    |
-| CNN (Johnson et al., 2017) | ? | 0.934    |
-| CNN (Zhang et al., 2015) | ?   | 0.905    |
+| BERTLARGE  | 330M   | 0.946    |
+| BERTBASE   | 110M   | 0.940    |
+| CNN (Johnson, 2017) | ? | 0.934    |
+| CNN (Zhang, 2015)   | ? | 0.905    |
 
 To get better classification performance, we use learning rate warmup followed by square-root decay.
+
+Note: As of TF 1.14, learning rate scheduling requires our [custom patch of TensorFlow](https://github.com/NVAITC/tensorflow-patched/releases/tag/v1.14.1-patch0). If you're using our container [`nvaitc/ai-lab:19.07`](https://cloud.docker.com/u/nvaitc/repository/docker/nvaitc/ai-lab) or newer, the patch is already included.
 
 ## Acknowledgements
 

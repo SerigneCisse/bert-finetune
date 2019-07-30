@@ -152,7 +152,7 @@ else:
             BATCH_SIZE = 160
     else:
         if args.bertlarge:
-            BATCH_SIZE = 19
+            BATCH_SIZE = 18
         else:
             BATCH_SIZE = 80
 
@@ -185,8 +185,7 @@ else:
     print_progress = False
     
 train_text, train_label, num_classes = utils.load_ag_news_dataset(max_seq_len=MAX_SEQ_LEN,
-                                                                  test=False,
-                                                                  augment=args.augment)
+                                                                  test=False)
 if num_classes > 120:
     # if layer is too big (close to 128)
     # pad to multiple of 8 to enable Tensor Cores
@@ -289,7 +288,7 @@ if args.lr:
     LEARNING_RATE = args.lr
 else:
     # scale LR by sqrt of number of workers
-    LEARNING_RATE = 2e-5 * (hvd.size() ** 0.5)
+    LEARNING_RATE = 1e-5 * (hvd.size() ** 0.5)
     
 opt = tf.keras.optimizers.Adam(lr=LEARNING_RATE, decay=0.0)
 

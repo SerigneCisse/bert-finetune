@@ -7,7 +7,7 @@ from sklearn.utils import shuffle
 import tensorflow.compat.v1 as tf
 
 
-def load_ag_news_dataset(max_seq_len=512, test=False, augment=False):
+def load_ag_news_dataset(max_seq_len=512, test=False):
     """Loads the AG News corpus, which consists of news articles
     from the 4 largest classes in the AG’s corpus of news articles.
     The dataset contains 30,000 training examples for each class
@@ -28,11 +28,7 @@ def load_ag_news_dataset(max_seq_len=512, test=False, augment=False):
         else:
             df = pd.read_csv(dataset_path+"/train.csv",
                              names=["label", "title", "article"], header=None)
-            if augment:
-                df_eo = pd.read_csv(dataset_path+"/train.csv",
-                                    names=["label", "title", "article"], header=None)
-                df_spa = pd.read_csv(dataset_path+"/train.csv",
-                                     names=["label", "title", "article"], header=None)
+            
     except Exception as e:
         print("Encounter weird pandas race condition", e)
         time.sleep(1)
@@ -43,27 +39,13 @@ def load_ag_news_dataset(max_seq_len=512, test=False, augment=False):
         else:
             df = pd.read_csv(dataset_path+"/train.csv",
                              names=["label", "title", "article"], header=None)
-            if augment:
-                df_eo = pd.read_csv(dataset_path+"/train.csv",
-                                    names=["label", "title", "article"], header=None)
-                df_spa = pd.read_csv(dataset_path+"/train.csv",
-                                     names=["label", "title", "article"], header=None)
 
     if test:
         titles = df["title"].tolist()
         raw_examples = df["article"].tolist()
     else:
         titles = df["title"].tolist()
-        if augment:
-            titles_eo = df_eo["title"].tolist()
-            titles_spa = df_spa["title"].tolist()
-            titles = titles + titles_eo + titles_spa
-
         raw_examples = df["article"].tolist()
-        if augment:
-            raw_examples_eo = df_eo["article"].tolist()
-            raw_examples_spa = df_spa["article"].tolist()
-            raw_examples = raw_examples + raw_examples_eo + raw_examples_spa
     
     examples = []
     len_list = []
@@ -83,10 +65,6 @@ def load_ag_news_dataset(max_seq_len=512, test=False, augment=False):
         labels = df["label"].tolist()
     else:
         labels = df["label"].tolist()
-        if augment:
-            labels_eo = df_eo["label"].tolist()
-            labels_spa = df_spa["label"].tolist()
-            labels = labels + labels_eo + labels_spa
     
     # map labels (1 ~ x) to classes (0 ~ x-1)
     labels = np.asarray(labels) - 1
