@@ -45,6 +45,9 @@ parser.add_argument("--dev",
 parser.add_argument("--augment",
                     help="Use augmented dataset",
                     action="store_true")
+parser.add_argument("--profiling",
+                    help="Only run one example. Used for profiling kernels.",
+                    action="store_true")
 parser.add_argument("--epochs",
                     help="Number of epochs to train for",
                     type=int)
@@ -220,10 +223,17 @@ train_input_ids, train_input_masks, train_segment_ids, train_labels = shuffle(tr
 
 if args.dev:
     # for quicker testing during development, we reduce the dataset size
-    num_items = len(train_labels)//4
+    num_items = len(train_labels)//100
     train_input_ids, train_input_masks = train_input_ids[:num_items], train_input_masks[:num_items]
     train_segment_ids, train_labels = train_segment_ids[:num_items], train_labels[:num_items]
-
+    print("(Truncated dataset) Number of training examples:", num_items)
+    
+if args.profiling:
+    num_items = 1
+    train_input_ids, train_input_masks = train_input_ids[:num_items], train_input_masks[:num_items]
+    train_segment_ids, train_labels = train_segment_ids[:num_items], train_labels[:num_items]
+    print("(Truncated dataset) Number of training examples:", num_items)
+    
 # test set
 
 test_feat_cache = "./cache/test_feat.pickle."+str(hvd.rank())
@@ -252,6 +262,18 @@ test_input_ids, test_input_masks, test_segment_ids, test_labels = shuffle(test_i
 
 test_set = ([test_input_ids, test_input_masks, test_segment_ids], test_labels)
 
+if args.dev:
+    num_items = len(test_labels)//10
+    test_input_ids, test_input_masks = test_input_ids[:num_items], test_input_masks[:num_items]
+    test_segment_ids, test_labels = test_segment_ids[:num_items], test_labels[:num_items]
+    print("(Truncated dataset) Number of test examples:", num_items)
+
+if args.profiling:
+    num_items = 1
+    test_input_ids, test_input_masks = test_input_ids[:num_items], test_input_masks[:num_items]
+    test_segment_ids, test_labels = test_segment_ids[:num_items], test_labels[:num_items]
+    print("(Truncated dataset) Number of test examples:", num_items)
+    
 # =================
 # Build Keras model
 # =================
@@ -311,11 +333,6 @@ model.compile(loss="sparse_categorical_crossentropy",
 
 if hvd.rank() == 0:
     model.summary()
-    tf.keras.utils.plot_model(model,
-                              to_file=RESULTS_DIR+"model.png",
-                              show_shapes=True,
-                              show_layer_names=True,
-                              rankdir='TB')
 
 # ==============
 # Start training
@@ -344,14 +361,17 @@ if hvd.rank() == 0:
 else:
     verbose = 0
 
-callbacks = [
-    # average metrics among workers after every epoch
-    hvd_keras.callbacks.MetricAverageCallback(),
-    hvd_keras.callbacks.LearningRateWarmupCallback(warmup_epochs=1, verbose=verbose),
-    hvd_keras.callbacks.LearningRateScheduleCallback(start_epoch=1, end_epoch=10,
-                                                     staircase=True,
-                                                     multiplier=bert_optimizer.sqrt_decay),
-]
+if not args.profiling:
+    callbacks = [
+        # average metrics among workers after every epoch
+        hvd_keras.callbacks.MetricAverageCallback(),
+        hvd_keras.callbacks.LearningRateWarmupCallback(warmup_epochs=1, verbose=verbose),
+        hvd_keras.callbacks.LearningRateScheduleCallback(start_epoch=1, end_epoch=10,
+                                                         staircase=True,
+                                                         multiplier=bert_optimizer.sqrt_decay),
+    ]
+else:
+    callbacks = []
 
 if hvd.rank() == 0:
     if args.save_weights:

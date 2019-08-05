@@ -139,9 +139,9 @@ class BERT(tf.keras.layers.Layer):
     def compute_output_shape(self, input_shape):
         print("Input:", input_shape)
         if self.return_sequence:
-            return (input_shape[0], self.output_size, self.output_size)
+            return (input_shape[1], self.output_size)
         else:
-            return (input_shape[0], self.output_size)
+            return (self.output_size,)
 
 
 class PaddingInputExample(object):
