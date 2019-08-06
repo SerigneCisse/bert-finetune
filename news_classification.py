@@ -179,8 +179,8 @@ else:
 config.graph_options.optimizer_options.global_jit_level = opt_level
 config.graph_options.rewrite_options.auto_mixed_precision = args.amp
 config.gpu_options.force_gpu_compatible = True
-config.intra_op_parallelism_threads = multiprocessing.cpu_count()//2
-config.inter_op_parallelism_threads = multiprocessing.cpu_count()//2
+config.intra_op_parallelism_threads = multiprocessing.cpu_count()//hvd.size()
+config.inter_op_parallelism_threads = multiprocessing.cpu_count()//hvd.size()
 sess = tf.Session(config=config)
 tf.keras.backend.set_session(sess)
 
