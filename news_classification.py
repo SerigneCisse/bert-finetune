@@ -98,7 +98,7 @@ else:
 import os
 from pathlib import Path
 import pickle
-    
+import multiprocessing
 import numpy as np
 import pandas as pd
 from sklearn.utils import shuffle
@@ -163,9 +163,14 @@ else:
 # Create TensorFlow Session before loading BERT module
 # ====================================================
 
+os.environ["TF_GPU_THREAD_MODE"] = "gpu_private"
+os.environ["TF_GPU_THREAD_COUNT"] = "2"
+
+
 config = tf.ConfigProto()
 config.gpu_options.visible_device_list = str(hvd.local_rank())
 config.gpu_options.allow_growth = True
+config.gpu_options.Experimental.use_numa_affinity = True
 if args.xla:
     opt_level = tf.OptimizerOptions.ON_1
     tf.enable_resource_variables()
@@ -173,6 +178,9 @@ else:
     opt_level = tf.OptimizerOptions.OFF
 config.graph_options.optimizer_options.global_jit_level = opt_level
 config.graph_options.rewrite_options.auto_mixed_precision = args.amp
+config.gpu_options.force_gpu_compatible = True
+config.intra_op_parallelism_threads = multiprocessing.cpu_count()//2
+config.inter_op_parallelism_threads = multiprocessing.cpu_count()//2
 sess = tf.Session(config=config)
 tf.keras.backend.set_session(sess)
 
@@ -310,7 +318,7 @@ if args.lr:
     LEARNING_RATE = args.lr
 else:
     # scale LR by sqrt of number of workers
-    LEARNING_RATE = 1e-5 * (hvd.size() ** 0.5)
+    LEARNING_RATE = 2e-5 * (hvd.size() ** 0.5)
     
 opt = tf.keras.optimizers.Adam(lr=LEARNING_RATE, decay=0.0)
 
@@ -368,6 +376,7 @@ if not args.profiling:
         hvd_keras.callbacks.LearningRateWarmupCallback(warmup_epochs=1, verbose=verbose),
         hvd_keras.callbacks.LearningRateScheduleCallback(start_epoch=1, end_epoch=10,
                                                          staircase=True,
+                                                         multiplier=bert_optimizer.inv_decay),
                                                          multiplier=bert_optimizer.sqrt_decay),
     ]
 else:

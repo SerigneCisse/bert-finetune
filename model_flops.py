@@ -52,10 +52,6 @@ run_meta = tf.RunMetadata()
 
 _, _ = sess.run([optimizer, cost], options=run_options, run_metadata=run_meta)
 
-for node in sess.graph.as_graph_def().node:
-    input_shapes = [n.shape for n in node.inputs]
-    print(node.name, input_shapes)
-
 # get FLOPS
 
 opts = tf.profiler.ProfileOptionBuilder.float_operation()    
