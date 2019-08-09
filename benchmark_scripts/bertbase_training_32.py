@@ -187,5 +187,5 @@ log = model.fit([train_input_ids, train_input_masks, train_segment_ids],
                 train_labels, validation_data=test_set,
                 workers=4, use_multiprocessing=True,
                 verbose=2, callbacks=[],
-                epochs=3, batch_size=56)
+                epochs=3, batch_size=42)
 
