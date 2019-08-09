@@ -118,6 +118,10 @@ class BERT(tf.keras.layers.Layer):
                     print(var_name, "|", var_shape, "|", var_params)
 
         super(BERT, self).build(input_shape)
+        sess = tf.keras.backend.get_session()
+        sess.run(tf.local_variables_initializer())
+        sess.run(tf.global_variables_initializer())
+        sess.run(tf.tables_initializer())
 
     def call(self, inputs):
         input_ids, input_mask, segment_ids = inputs
@@ -142,6 +146,14 @@ class BERT(tf.keras.layers.Layer):
             return (input_shape[1], self.output_size)
         else:
             return (self.output_size,)
+        
+    def get_config(self):
+        config = super(BERT, self).get_config()
+        config.update({"fine_tune_layers": self.fine_tune_layers,
+                       "bert_path": self.bert_path,
+                       "output_size": self.output_size,
+                       "return_sequence": self.return_sequence})
+        return config
 
 
 class PaddingInputExample(object):

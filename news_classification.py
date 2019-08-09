@@ -42,8 +42,8 @@ parser.add_argument("--progress",
 parser.add_argument("--dev",
                     help="Only load a truncated dataset",
                     action="store_true")
-parser.add_argument("--augment",
-                    help="Use augmented dataset",
+parser.add_argument("--debug",
+                    help="Print TensorFlow debug output",
                     action="store_true")
 parser.add_argument("--profiling",
                     help="Only run one example. Used for profiling kernels.",
@@ -93,7 +93,7 @@ else:
 if args.maxseqlen:
     MAX_SEQ_LEN = args.maxseqlen
 else:
-    MAX_SEQ_LEN = 128
+    MAX_SEQ_LEN = 256
     
 import os
 from pathlib import Path
@@ -104,9 +104,13 @@ import pandas as pd
 from sklearn.utils import shuffle
 from sklearn.model_selection import train_test_split
 
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+import warnings
+warnings.filterwarnings('ignore')
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 import tensorflow.compat.v1 as tf
 tf.logging.set_verbosity(tf.logging.ERROR)
+
 from tensorflow.compat.v1.keras import layers
 import horovod.tensorflow as hvd
 import horovod.tensorflow.keras as hvd_keras
@@ -150,14 +154,14 @@ else:
     # use pre-determined batch size for current task
     if utils.get_gpu_vram() > 17000:
         if args.bertlarge:
-            BATCH_SIZE = 36
+            BATCH_SIZE = 20
         else:
-            BATCH_SIZE = 160
+            BATCH_SIZE = 140
     else:
         if args.bertlarge:
-            BATCH_SIZE = 18
+            BATCH_SIZE = 8
         else:
-            BATCH_SIZE = 80
+            BATCH_SIZE = 60
 
 # ====================================================
 # Create TensorFlow Session before loading BERT module
@@ -165,7 +169,6 @@ else:
 
 os.environ["TF_GPU_THREAD_MODE"] = "gpu_private"
 os.environ["TF_GPU_THREAD_COUNT"] = "2"
-
 
 config = tf.ConfigProto()
 config.gpu_options.visible_device_list = str(hvd.local_rank())
@@ -178,7 +181,6 @@ else:
     opt_level = tf.OptimizerOptions.OFF
 config.graph_options.optimizer_options.global_jit_level = opt_level
 config.graph_options.rewrite_options.auto_mixed_precision = args.amp
-config.gpu_options.force_gpu_compatible = True
 config.intra_op_parallelism_threads = multiprocessing.cpu_count()//hvd.size()
 config.inter_op_parallelism_threads = multiprocessing.cpu_count()//hvd.size()
 sess = tf.Session(config=config)
@@ -197,11 +199,6 @@ else:
     
 train_text, train_label, num_classes = utils.load_ag_news_dataset(max_seq_len=MAX_SEQ_LEN,
                                                                   test=False)
-if num_classes > 120:
-    # if layer is too big (close to 128)
-    # pad to multiple of 8 to enable Tensor Cores
-    num_classes = ((num_classes//8)+1)*8
-    print("\n[INFO  ] Padded number of classes:", num_classes, "\n")
 
 # load, preprocess and save data to pickle
 
@@ -232,14 +229,18 @@ train_input_ids, train_input_masks, train_segment_ids, train_labels = shuffle(tr
 if args.dev:
     # for quicker testing during development, we reduce the dataset size
     num_items = len(train_labels)//100
-    train_input_ids, train_input_masks = train_input_ids[:num_items], train_input_masks[:num_items]
-    train_segment_ids, train_labels = train_segment_ids[:num_items], train_labels[:num_items]
+    train_input_ids, train_input_masks, train_segment_ids, train_labels = utils.trunc_dataset(train_input_ids,
+                                                                                              train_input_masks,
+                                                                                              train_segment_ids,
+                                                                                              train_labels)
     print("(Truncated dataset) Number of training examples:", num_items)
     
 if args.profiling:
     num_items = 1
-    train_input_ids, train_input_masks = train_input_ids[:num_items], train_input_masks[:num_items]
-    train_segment_ids, train_labels = train_segment_ids[:num_items], train_labels[:num_items]
+    train_input_ids, train_input_masks, train_segment_ids, train_labels = utils.trunc_dataset(train_input_ids,
+                                                                                              train_input_masks,
+                                                                                              train_segment_ids,
+                                                                                              train_labels)
     print("(Truncated dataset) Number of training examples:", num_items)
     
 # test set
@@ -272,14 +273,18 @@ test_set = ([test_input_ids, test_input_masks, test_segment_ids], test_labels)
 
 if args.dev:
     num_items = len(test_labels)//10
-    test_input_ids, test_input_masks = test_input_ids[:num_items], test_input_masks[:num_items]
-    test_segment_ids, test_labels = test_segment_ids[:num_items], test_labels[:num_items]
+    test_input_ids, test_input_masks, test_segment_ids, test_labels = utils.trunc_dataset(test_input_ids,
+                                                                                          test_input_masks,
+                                                                                          test_segment_ids,
+                                                                                          test_labels)
     print("(Truncated dataset) Number of test examples:", num_items)
 
 if args.profiling:
     num_items = 1
-    test_input_ids, test_input_masks = test_input_ids[:num_items], test_input_masks[:num_items]
-    test_segment_ids, test_labels = test_segment_ids[:num_items], test_labels[:num_items]
+    test_input_ids, test_input_masks, test_segment_ids, test_labels = utils.trunc_dataset(test_input_ids,
+                                                                                          test_input_masks,
+                                                                                          test_segment_ids,
+                                                                                          test_labels)
     print("(Truncated dataset) Number of test examples:", num_items)
     
 # =================
@@ -318,7 +323,7 @@ if args.lr:
     LEARNING_RATE = args.lr
 else:
     # scale LR by sqrt of number of workers
-    LEARNING_RATE = 2e-5 * (hvd.size() ** 0.5)
+    LEARNING_RATE = 1e-5 * (hvd.size() ** 0.5)
     
 opt = tf.keras.optimizers.Adam(lr=LEARNING_RATE, decay=0.0)
 
@@ -349,12 +354,9 @@ if hvd.rank() == 0:
 rank_prefix = "[" + str(hvd.rank()) + "]"
 utils.print_title(rank_prefix + " Started Training")
 
-# initialize the session
-
 sess.run(tf.local_variables_initializer())
 sess.run(tf.global_variables_initializer())
 sess.run(tf.tables_initializer())
-tf.keras.backend.set_session(sess)
 
 # Broadcast initial variable states from rank 0 to all other processes:
 
@@ -373,11 +375,10 @@ if not args.profiling:
     callbacks = [
         # average metrics among workers after every epoch
         hvd_keras.callbacks.MetricAverageCallback(),
-        hvd_keras.callbacks.LearningRateWarmupCallback(warmup_epochs=1, verbose=verbose),
-        hvd_keras.callbacks.LearningRateScheduleCallback(start_epoch=1, end_epoch=10,
+        hvd_keras.callbacks.LearningRateWarmupCallback(warmup_epochs=2, verbose=verbose),
+        hvd_keras.callbacks.LearningRateScheduleCallback(start_epoch=2, end_epoch=10,
                                                          staircase=True,
                                                          multiplier=bert_optimizer.inv_decay),
-                                                         multiplier=bert_optimizer.sqrt_decay),
     ]
 else:
     callbacks = []

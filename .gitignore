@@ -8,6 +8,7 @@
 .local
 .config
 *.h5
+*.pb
 */*.h5
 *.gz
 */__pycache__

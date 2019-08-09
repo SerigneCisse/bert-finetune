@@ -1,4 +1,6 @@
-Downloaded repository from https://github.com/google-research/bert
+Adapted some components from https://github.com/google-research/bert
+
+Original README below:
 
 # BERT
 

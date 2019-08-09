@@ -16,6 +16,9 @@ import numpy as np
 import tensorflow.compat.v1 as tf
 from math import cos, floor, sqrt, pi
     
+def inv_decay(epoch):
+    return 2/epoch
+    
 def sqrt_decay(epoch):
     return 1/np.sqrt(epoch)
 

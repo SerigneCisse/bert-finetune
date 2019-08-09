@@ -18,7 +18,11 @@ parser.add_argument("--agnews",
 
 args = parser.parse_args()
 
+import os
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 import tensorflow.compat.v1 as tf
+tf.logging.set_verbosity(tf.logging.ERROR)
+
 from tensorflow.compat.v1.keras import layers
 import bert_utils
 

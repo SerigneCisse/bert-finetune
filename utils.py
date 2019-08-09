@@ -105,7 +105,9 @@ def shard_dataset(examples, labels, hvd):
 
     return examples, labels
 
-
+def trunc_dataset(input_list_1, input_list_2, input_list_3, input_list_4, num_items):
+    return input_list_1[:num_items], input_list_2[:num_items], input_list_3[:num_items], input_list_4[:num_items]
+    
 try:
     import GPUtil
 
