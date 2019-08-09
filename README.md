@@ -1,10 +1,15 @@
 # Fine-tuning BERT
 
+![header](images/bert_header.jpg)
+
 **[BERT](https://arxiv.org/abs/1810.04805)** (Bidirectional Encoder Representations from Transformers) is a state-of-the-art NLP language model. BERT achieves state-of-the-art performance on a wide range of NLP tasks without any task specific architecture. Hence, we can fine-tune BERT or even combine it with other layers to create novel architectures. Since BERT is a large model, we require scaled-up training to iterate swiftly and enable productive experimentation.
 
-In this repository, we provide a performance-optimized examples for training BERT at a single-node, multi-gpu scale. We explain how we deliver more than 3x performance improvement (over a baseline implementation) on a DGX-1V with V100 on BERT finetuning tasks for both BERTBASE and BERTLARGE.
+In this repository, we provide a performance-optimized examples for training BERT at a single-node, multi-gpu scale. We explain how we deliver at least 3× performance improvement (over a baseline implementation) on an NVIDIA DGX-1V, on BERT fine-tuning tasks for both BERTBASE and BERTLARGE. We also show that you can exceed 5× performance improvment by moving from 16GB to 32GB V100 GPUs.
 
-![header](images/bert_header.jpg)
+<p align="center">
+  <img src="https://raw.githubusercontent.com/NVAITC/bert-finetune/master/images/bertbase_title.jpg" width="45%">
+  <img src="https://raw.githubusercontent.com/NVAITC/bert-finetune/master/images/bertlarge_title.jpg" width="45%">
+</p>
 
 The code in this repository demonstrates:
 
@@ -12,6 +17,8 @@ The code in this repository demonstrates:
 * [Performance Enhancements](#performance-enhancements). Applying the XLA compiler and Automatic Mixed Precision (AMP) to speed up BERT training significantly on NVIDIA Tensor Core GPUs.
 * [Efficient multi-GPU training](#efficient-scaling-on-multiple-gpus). This is achieved using Horovod. We use FP16 compression and sparse-to-dense tensor conversion during communication to improve scaling performance.
 * [Conversion to TensorRT](convert_tensorrt.ipynb) for efficient inference on platforms such as TensorRT Inference Server or TensorFlow Serving.
+
+See [`FILES.md`](FILES.md) for an overview of the different files and directories contained in this repository. 
 
 ## BERT Specifics
 
@@ -32,7 +39,7 @@ You can view a Jupyter notebook that breaks down the process [here](bert_input.i
 
 ### BERT Keras Layer
 
-The BERT layer ([see docstring](https://github.com/NVAITC/examples/blob/master/bert_finetune/bert_utils.py#L10)) can be instantiated easily:
+The BERT layer ([see docstring](https://github.com/NVAITC/bert-finetune/blob/master/bert_utils.py#L10)) can be instantiated easily:
 
 ```python
 l = bert_utils.BERT(fine_tune_layers=TUNE_LAYERS, # number of cells to tune, "-1" means everything
@@ -44,7 +51,7 @@ l = bert_utils.BERT(fine_tune_layers=TUNE_LAYERS, # number of cells to tune, "-1
 
 Here is a simple notebook to demonstrate the instantiation of the of BERT layer: [link](https://github.com/NVAITC/examples/blob/master/bert_finetune/bert_layer.ipynb). Turning on the `debug` flag will cause a printout of the number of layers, as well as the dimensions and parameter count of all trainable variables in the instantiated layer.
 
-Note that there are two main variants of the BERT model described in the paper and available on TFHub. 
+Note that there are two main variants of the BERT model described in the paper and available on TFHub: 
 
 | Model     | Hidden layers (L) | Hidden unit size (H) | Attention heads (A) | Feedforward filter size | Max sequence length | Parameters |
 | --------- | ------------- | ---------------- | --------------- | ----------------------- | ------------------- | ---------- |
@@ -55,11 +62,11 @@ Note that there are two main variants of the BERT model described in the paper a
 
 ### Enabling Performance Features
 
-By enabling performance features such as the [XLA](https://www.tensorflow.org/xla/overview) compiler and [Automatic Mixed Precision (AMP)](https://developer.nvidia.com/automatic-mixed-precision), we can get a performance improvement of about 3x on a DGX-1V system when training BERT.
+By enabling performance features such as the [XLA](https://www.tensorflow.org/xla/overview) compiler and [Automatic Mixed Precision (AMP)](https://developer.nvidia.com/automatic-mixed-precision), we can get a performance improvement of at least 3x on a DGX-1V system when training BERT.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/NVAITC/bert-finetune/master/images/bertbase_perf.jpg" width="48%">
-  <img src="https://raw.githubusercontent.com/NVAITC/bert-finetune/master/images/bertlarge_perf.jpg" width="48%">
+  <img src="https://raw.githubusercontent.com/NVAITC/bert-finetune/master/images/bertbase_tf_perf.jpg" width="49%">
+  <img src="https://raw.githubusercontent.com/NVAITC/bert-finetune/master/images/bertlarge_tf_perf.jpg" width="49%">
 </p>
 
 Note that these benchmarks are run production DGX-1 on Max-Q (power efficiency) and hence are not formal guarantees of performance (your numbers will likely be about 20-30% higher). Using the V100 32GB enables you to at least double the batch size, and thus get much better training throughput for large models like BERTLARGE.
@@ -75,15 +82,14 @@ config.graph_options.rewrite_options.auto_mixed_precision = True
 sess = tf.Session(config=config)
 tf.keras.backend.set_session(sess)
 
-# In TF 1.x:
-# Enable Resource Variables to improve efficiency of XLA fusions
+# (TF 1.x:) Enable Resource Variables to improve efficiency of XLA fusions
 tf.enable_resource_variables() 
 ```
 
 Create the AMP optimizer and use it to compile the Keras model. The AMP optimizer performs dynamic loss scaling to avoid NaN/Inf and gradient underflow problems.
 
 ```python
-opt = tf.train.experimental.enable_mixed_precision_graph_rewrite(opt)
+opt = tf.keras.mixed_precision.experimental.LossScaleOptimizer(opt, "dynamic")
 
 model.compile(loss="sparse_categorical_crossentropy",
               optimizer=opt,
@@ -98,12 +104,14 @@ BERT has a large number of parameters (110M or 330M), which makes it important t
   <img src="https://raw.githubusercontent.com/NVAITC/bert-finetune/master/images/bert_scaling.jpg" width="80%">
 </p>
 
+`(TODO: Replace outdated image above)`
+
 >If you are new to Horovod or distributed training, please view:
 >* [Basic Horovod MPI concepts](https://github.com/horovod/horovod/blob/master/docs/concepts.rst)
 >* [Horovod Simple MNIST example](https://github.com/horovod/horovod/blob/master/examples/keras_mnist.py)
 >* [NCCL](https://developer.nvidia.com/nccl)
 
-BERT has a large Embedding layer which produces gradients as sparse [`IndexedSlices`](https://www.tensorflow.org/api_docs/python/tf/IndexedSlices) objects. As a result gradients are accumulated via allgather instead of allreduce. We use sparse to dense tensor conversion to force the gradients to be accumulated using allreduce instead, at the cost of increase memory usage. By futher using FP16 compression, we can increase the overall training performance of BERTBASE by about 40% as measured on a DGX-1V (8 V100 with NVLink), or about 15% for BERTLARGE. 
+BERT has a large Embedding layer which produces gradients as sparse [`IndexedSlices`](https://www.tensorflow.org/api_docs/python/tf/IndexedSlices) objects. As a result gradients are accumulated via allgather instead of allreduce. We use sparse to dense tensor conversion to force the gradients to be accumulated using allreduce instead, at the cost of increase memory usage. By futher using FP16 compression, we can increase the overall training throughput by about 20%-30% as measured on a DGX-1V (8 V100 with NVLink).
 
 ```python
 optimizer = hvd_keras.DistributedOptimizer(optimizer,
@@ -111,19 +119,26 @@ optimizer = hvd_keras.DistributedOptimizer(optimizer,
                                            sparse_as_dense=True)
 ```
 
-![BERT Horovod tuning](images/bert_horovod.jpg)
-
-The performance increase for BERTLARGE is much less since the Embedding layer is less than half as large (9% in BERTLARGE vs 21% in BERTBASE).
-
 <p align="center">
-  <img src="https://raw.githubusercontent.com/NVAITC/bert-finetune/master/images/bertbase_params.jpg" width="48%">
-  <img src="https://raw.githubusercontent.com/NVAITC/bert-finetune/master/images/bertlarge_params.jpg" width="48%">
+  <img src="https://raw.githubusercontent.com/NVAITC/bert-finetune/master/images/bertbase_hvd_perf.jpg" width="49%">
+  <img src="https://raw.githubusercontent.com/NVAITC/bert-finetune/master/images/bertlarge_hvd_perf.jpg" width="49%">
 </p>
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/NVAITC/bert-finetune/master/images/bertbase_params.jpg" width="49%">
+  <img src="https://raw.githubusercontent.com/NVAITC/bert-finetune/master/images/bertlarge_params.jpg" width="49%">
+</p>
 
 **Impact of NVLink Interconnect (DGX-1V)**
 
-When we disable NVLink during model training (`-x NCCL_P2P_DISABLE=1`), communication takes place exclusively over the PCIE bus and training performance drops anywhere from 25% (BERTBASE) up to 50% (BERTLARGE) for the otherwise fully optimized training routine (FP16 compression, `sparse_as_dense=True`, XLA+AMP). 
+When we disable NVLink during model training (`-x NCCL_P2P_DISABLE=1`), communication takes place exclusively over the PCIE bus and training performance drops anywhere from 16% (BERTBASE) up to 44% (BERTLARGE) for the otherwise fully optimized training routine (FP16 compression, `sparse_as_dense=True`, XLA+AMP). 
+
+On a DGX-1V (Max-Q mode) with 32GB V100:
+
+| Model     | With NVLink | Without NVLink | Slowdown |
+| --------- | ----------- | -------------- | -------- |
+| BERTBASE  | 719         | 618            | 16%      |
+| BERTLARGE | 206         | 143            | 44%      |
 
 ### Additional Optimizations
 
@@ -131,7 +146,7 @@ When we disable NVLink during model training (`-x NCCL_P2P_DISABLE=1`), communic
 
 We can use the LazyAdam optimizer to slightly reduce the VRAM usage of the optimizer. It is a variant of the Adam optimizer that handles sparse gradient updates more efficiently. However, it provides slightly different semantics than the original Adam algorithm, and may lead to different empirical results (in practice there is no real difference).
 
-LazyAdam provides an inconsistent performance boost (depending on model/training configuration) hence we leave it off in most cases. It is provided here as an additional option for the user, especially if you face issues such as OOM on second epoch. 
+LazyAdam provides an inconsistent performance boost (depending on model/training configuration) hence we leave it off in most cases. It is provided here as an additional option for the user. We find this useful if you face OOM issues, such as OOM on only during second epoch. 
 
 ### Performance Analysis
 
@@ -149,12 +164,14 @@ SOL (Speed Of Light) refers to the theoretical throughput of the GPU. We are abl
 | volta_fp16_s884gemm_fp16_256x128_ldg8_f2f_nt | 2%  | 12.54 | 15.74 |
 | **top_6_kernels**                            | **50%** | **10.03** | **18.45** |
 
-We are also able to estimate the model FLOPS during training using [this notebook](model_flops.ipynb). This estimate is a lower-bound, as there are some operations that are not accounted for due to lack of information on input shape etc. The table below represents values recorded on a DGX-1V with 8 V100 (32GB) on Max-Q mode. 
+We are also able to estimate the model FLOPS during training using [this notebook](model_flops.ipynb). This estimate is a lower-bound, as there are some operations that are not accounted for due to lack of information on input shape etc. 
+
+The table below represents values recorded on a DGX-1V with 8 V100 (32GB) on Max-Q mode:
 
 | Model     | Examples per second | Effective TFLOPS |
 | --------- | ------------------- | ---------------- |
-| BERTBASE  | 533                 | >140.18          |
-| BERTLARGE | 160                 | >149.31          |
+| BERTBASE  | 719                 | > 189.1          |
+| BERTLARGE | 206                 | > 192.2          |
 
 On a single V100 (16GB) card on a DGX Station, we recorded an average of 84.75 examples per second. This translates to >22.29 TFLOPS, or about 19% of the peak 120 TFLOPS half-precision capable on a V100 (16GB) card in the DGX Station. 
 
