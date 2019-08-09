@@ -92,7 +92,7 @@ model.compile(loss="sparse_categorical_crossentropy",
 
 ### Efficient Scaling on Multiple GPUs
 
-BERT has a large number of parameters (110M or 330M), which makes it important to reduce the communication overhead when synchronizing between workers by using a library such as [**Horovod**](https://github.com/horovod/horovod). Horovod uses NCCL (NVIDIA Collective Communications Library) which provides optimized implementation of inter-GPU communication operations, which can leverage the high-performance NVLINK or NVSWITCH interconnect between GPUs. We can get extremely good scaling efficiency (96%) when using Horovod.
+BERT has a large number of parameters (110M or 330M), which makes it important to reduce the communication overhead when synchronizing between workers by using a library such as [**Horovod**](https://github.com/horovod/horovod). Horovod uses NCCL (NVIDIA Collective Communications Library) which provides optimized implementation of inter-GPU communication operations, which can leverage the high-performance NVLink or NVSWITCH interconnect between GPUs. We can get extremely good scaling efficiency (96%) when using Horovod.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/NVAITC/bert-finetune/master/images/bert_scaling.jpg" width="80%">
@@ -103,7 +103,7 @@ BERT has a large number of parameters (110M or 330M), which makes it important t
 >* [Horovod Simple MNIST example](https://github.com/horovod/horovod/blob/master/examples/keras_mnist.py)
 >* [NCCL](https://developer.nvidia.com/nccl)
 
-BERT has a large Embedding layer which produces gradients as sparse [`IndexedSlices`](https://www.tensorflow.org/api_docs/python/tf/IndexedSlices) objects. As a result gradients are accumulated via allgather instead of allreduce. We use sparse to dense tensor conversion to force the gradients to be accumulated using allreduce instead, at the cost of increase memory usage. By futher using FP16 compression, we can increase the overall training performance of BERTBASE by about 40% as measured on a DGX-1V (8 V100 with NVLINK), or about 15% for BERTLARGE. 
+BERT has a large Embedding layer which produces gradients as sparse [`IndexedSlices`](https://www.tensorflow.org/api_docs/python/tf/IndexedSlices) objects. As a result gradients are accumulated via allgather instead of allreduce. We use sparse to dense tensor conversion to force the gradients to be accumulated using allreduce instead, at the cost of increase memory usage. By futher using FP16 compression, we can increase the overall training performance of BERTBASE by about 40% as measured on a DGX-1V (8 V100 with NVLink), or about 15% for BERTLARGE. 
 
 ```python
 optimizer = hvd_keras.DistributedOptimizer(optimizer,
@@ -121,9 +121,9 @@ The performance increase for BERTLARGE is much less since the Embedding layer is
 </p>
 
 
-**Impact of NVLINK Interconnect (DGX-1V)**
+**Impact of NVLink Interconnect (DGX-1V)**
 
-When we disable NVLINK during model training (`-x NCCL_P2P_DISABLE=1`), communication takes place exclusively over the PCIE bus and training performance drops anywhere from 25% (BERTBASE) up to 50% (BERTLARGE) for the otherwise fully optimized training routine (FP16 compression, `sparse_as_dense=True`, XLA+AMP). 
+When we disable NVLink during model training (`-x NCCL_P2P_DISABLE=1`), communication takes place exclusively over the PCIE bus and training performance drops anywhere from 25% (BERTBASE) up to 50% (BERTLARGE) for the otherwise fully optimized training routine (FP16 compression, `sparse_as_dense=True`, XLA+AMP). 
 
 ### Additional Optimizations
 
