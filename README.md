@@ -58,7 +58,7 @@ Note that there are two main variants of the BERT model described in the paper a
 
 ## Performance Enhancements
 
-### Enabling Performance Features
+### Enabling TensorFlow Performance Features
 
 By enabling performance features such as the [XLA](https://www.tensorflow.org/xla/overview) compiler and [Automatic Mixed Precision (AMP)](https://developer.nvidia.com/automatic-mixed-precision), we can get a performance improvement of at least 3x on a DGX-1V system when training BERT.
 
@@ -96,7 +96,7 @@ model.compile(loss="sparse_categorical_crossentropy",
 
 ### Efficient Scaling on Multiple GPUs
 
-BERT has a large number of parameters (110M or 330M), which makes it important to reduce the communication overhead when synchronizing between workers by using a library such as [**Horovod**](https://github.com/horovod/horovod). Horovod uses NCCL (NVIDIA Collective Communications Library) which provides optimized implementation of inter-GPU communication operations, which can leverage the high-performance NVLink or NVSWITCH interconnect between GPUs. We can get extremely good scaling efficiency (96%) when using Horovod.
+BERT has a large number of parameters (110M or 330M), which makes it important to reduce the communication overhead when synchronizing between workers by using a library such as [**Horovod**](https://github.com/horovod/horovod). Horovod uses NCCL (NVIDIA Collective Communications Library) which provides optimized implementation of inter-GPU communication operations, which can leverage the high-performance NVLink or NVSwitch interconnect between GPUs. We can get extremely good scaling efficiency (96%) when using Horovod.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/NVAITC/bert-finetune/master/images/bert_scaling.jpg" width="80%">
@@ -107,7 +107,9 @@ BERT has a large number of parameters (110M or 330M), which makes it important t
 >* [Horovod Simple MNIST example](https://github.com/horovod/horovod/blob/master/examples/keras_mnist.py)
 >* [NCCL](https://developer.nvidia.com/nccl)
 
-BERT has a large Embedding layer which produces gradients as sparse [`IndexedSlices`](https://www.tensorflow.org/api_docs/python/tf/IndexedSlices) objects. As a result gradients are accumulated via allgather instead of allreduce. We use sparse to dense tensor conversion to force the gradients to be accumulated using allreduce instead, at the cost of increase memory usage. By futher using FP16 compression, we can increase the overall training throughput by about 20%-30% as measured on a DGX-1V (8 V100 with NVLink).
+#### Optimal Horovod Configuration
+
+BERT has a large Embedding layer which produces gradients as sparse [`IndexedSlices`](https://www.tensorflow.org/api_docs/python/tf/IndexedSlices) objects. As a result gradients are accumulated via allgather instead of allreduce. We use sparse to dense tensor conversion to force the gradients to be accumulated using allreduce instead, at the cost of increase memory usage. By futher using FP16 compression, we can increase the overall training throughput as measured on a DGX-1V (8 V100 with NVLink).
 
 ```python
 optimizer = hvd_keras.DistributedOptimizer(optimizer,
@@ -127,16 +129,18 @@ Due to the relatively large proportion of parameters being from the Embedding la
   <img src="https://raw.githubusercontent.com/NVAITC/bert-finetune/master/images/bertlarge_params.jpg" width="49%">
 </p>
 
-**Impact of NVLink Interconnect (DGX-1V)**
+#### Impact of NVLink Interconnect (DGX-1V)
 
 When we disable NVLink during model training (`-x NCCL_P2P_DISABLE=1`), communication takes place exclusively over the PCIE bus and training performance drops anywhere from 16% to 44% for the otherwise fully optimized training routine (FP16 compression, `sparse_as_dense=True`, XLA+AMP). 
 
 On a DGX-1V (Max-Q mode) with 32GB V100:
 
-| Model     | With NVLink    | Without NVLink | Slowdown |
-| --------- | -------------- | -------------- | -------- |
-| BERTBASE  | 719 examples/s | 618 examples/s | 16%      |
-| BERTLARGE | 206 examples/s | 143 examples/s | 44%      |
+| Model     | Avg NVLink BW | With NVLink    | Without NVLink | Slowdown |
+| --------- | ------------- | -------------- | -------------- | -------- |
+| BERTBASE  | 3 GB/s        | 719 examples/s | 618 examples/s | 16%      |
+| BERTLARGE | 10 GB/s       | 206 examples/s | 143 examples/s | 44%      |
+
+This also leads us to the conclusion that in order for inter-node network bandwidth (not tested) to not be a bottleneck, we require at least 25-gigabit (BERTBASE) or 100-gigabit networking (BERTLARGE). 
 
 ### Additional Optimizations
 
@@ -145,6 +149,27 @@ On a DGX-1V (Max-Q mode) with 32GB V100:
 We can use the LazyAdam optimizer to slightly reduce the VRAM usage of the optimizer. It is a variant of the Adam optimizer that handles sparse gradient updates more efficiently. However, it provides slightly different semantics than the original Adam algorithm, and may lead to different empirical results (in practice there is no real difference).
 
 LazyAdam provides an inconsistent performance boost (depending on model/training configuration) hence we leave it off in most cases. It is provided here as an additional option for the user. We find this useful if you face OOM issues, such as OOM on only during second epoch. 
+
+**Misc TensorFlow Flags**
+
+We additional set the following TensorFlow flags, which might improve or provide more consistent performance on some systems:
+
+```python
+# Tensorflow environment variables
+
+# each GPU has dedicated threads to launch kernels
+os.environ["TF_GPU_THREAD_MODE"] = "gpu_private"
+# two threads per GPU
+os.environ["TF_GPU_THREAD_COUNT"] = "2"
+
+# TensorFlow session config
+
+# enable NUMA awareness for multi-socket systems
+config.gpu_options.Experimental.use_numa_affinity = True
+# use number of physical cores to execute parallelizable CPU ops
+config.intra_op_parallelism_threads = multiprocessing.cpu_count()//hvd.size()
+config.inter_op_parallelism_threads = multiprocessing.cpu_count()//hvd.size()
+```
 
 ### Performance Analysis
 

@@ -158,7 +158,7 @@ model = tf.keras.models.Model(inputs=in_bert, outputs=out_pred)
 # In[10]:
 
 
-opt = bert_optimizer.Adam(lr=LEARNING_RATE)
+opt = tf.keras.optimizers.Adam(lr=LEARNING_RATE)
 
 if USE_AMP:
     opt = tf.keras.mixed_precision.experimental.LossScaleOptimizer(opt, "dynamic")
