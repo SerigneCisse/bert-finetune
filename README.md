@@ -96,7 +96,7 @@ model.compile(loss="sparse_categorical_crossentropy",
 
 ### Efficient Scaling on Multiple GPUs
 
-BERT has a large number of parameters (110M or 330M), which makes it important to reduce the communication overhead when synchronizing between workers by using a library such as [**Horovod**](https://github.com/horovod/horovod). Horovod uses NCCL (NVIDIA Collective Communications Library) which provides optimized implementation of inter-GPU communication operations, which can leverage the high-performance NVLink or NVSwitch interconnect between GPUs. We can get extremely good scaling efficiency (96%) when using Horovod.
+BERT has a large number of parameters (110M or 330M), which makes it important to reduce the communication overhead when synchronizing between workers by using a library such as [**Horovod**](https://github.com/horovod/horovod). Horovod uses NCCL (NVIDIA Collective Communications Library) which provides optimized implementation of inter-GPU communication operations, which can leverage the high-performance NVLink or NVSwitch interconnect between GPUs. We can get extremely good scaling efficiency (98%) when using Horovod and NVLink.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/NVAITC/bert-finetune/master/images/bert_scaling.jpg" width="80%">
