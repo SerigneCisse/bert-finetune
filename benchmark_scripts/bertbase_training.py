@@ -158,7 +158,7 @@ model = tf.keras.models.Model(inputs=in_bert, outputs=out_pred)
 # In[10]:
 
 
-opt = bert_optimizer.LazyAdam(lr=LEARNING_RATE)
+opt = bert_optimizer.Adam(lr=LEARNING_RATE)
 
 if USE_AMP:
     opt = tf.keras.mixed_precision.experimental.LossScaleOptimizer(opt, "dynamic")
@@ -187,5 +187,5 @@ log = model.fit([train_input_ids, train_input_masks, train_segment_ids],
                 train_labels, validation_data=test_set,
                 workers=4, use_multiprocessing=True,
                 verbose=2, callbacks=[],
-                epochs=3, batch_size=18)
+                epochs=3, batch_size=16)
 

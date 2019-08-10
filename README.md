@@ -6,10 +6,7 @@
 
 In this repository, we provide a performance-optimized examples for training BERT at a single-node, multi-gpu scale. We explain how we deliver at least 3× performance improvement (over a baseline implementation) on an NVIDIA DGX-1V, on BERT fine-tuning tasks for both BERTBASE and BERTLARGE. We also show that you can exceed 5× performance improvment by moving from 16GB to 32GB V100 GPUs.
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/NVAITC/bert-finetune/master/images/bertbase_title.jpg" width="45%">
-  <img src="https://raw.githubusercontent.com/NVAITC/bert-finetune/master/images/bertlarge_title.jpg" width="45%">
-</p>
+![overall_perf](images/bert_title_perf.jpg)
 
 The code in this repository demonstrates:
 
@@ -17,8 +14,9 @@ The code in this repository demonstrates:
 * [Performance Enhancements](#performance-enhancements). Applying the XLA compiler and Automatic Mixed Precision (AMP) to speed up BERT training significantly on NVIDIA Tensor Core GPUs.
 * [Efficient multi-GPU training](#efficient-scaling-on-multiple-gpus). This is achieved using Horovod. We use FP16 compression and sparse-to-dense tensor conversion during communication to improve scaling performance.
 * [Conversion to TensorRT](convert_tensorrt.ipynb) for efficient inference on platforms such as TensorRT Inference Server or TensorFlow Serving.
+* See [`FILES.md`](FILES.md) for an overview of the different files and directories contained in this repository.
 
-See [`FILES.md`](FILES.md) for an overview of the different files and directories contained in this repository. 
+Note that these benchmarks are run on a DGX-1V on Max-Q (power efficiency) mode, where each V100 is configured to have a TDP of 160W. Hence, the benchmarks provided are not formal guarantees of performance, and your numbers will likely be at least 20% higher.
 
 ## BERT Specifics
 
@@ -69,7 +67,7 @@ By enabling performance features such as the [XLA](https://www.tensorflow.org/xl
   <img src="https://raw.githubusercontent.com/NVAITC/bert-finetune/master/images/bertlarge_tf_perf.jpg" width="49%">
 </p>
 
-Note that these benchmarks are run production DGX-1 on Max-Q (power efficiency) and hence are not formal guarantees of performance (your numbers will likely be about 20-30% higher). Using the V100 32GB enables you to at least double the batch size, and thus get much better training throughput for large models like BERTLARGE.
+Using the V100 32GB enables you to at least double the batch size, and thus get much better training throughput for large models like BERTLARGE.
 
 Create a TensorFlow session with AMP and XLA enabled:
 
@@ -86,7 +84,7 @@ tf.keras.backend.set_session(sess)
 tf.enable_resource_variables() 
 ```
 
-Create the AMP optimizer and use it to compile the Keras model. The AMP optimizer performs dynamic loss scaling to avoid NaN/Inf and gradient underflow problems.
+Create the AMP optimizer and use it to compile the Keras model. The AMP optimizer performs dynamic loss scaling to avoid NaN/Inf and gradient underflow problems. You can consult the [relevant TensorFlow documentation](https://www.tensorflow.org/api_docs/python/tf/keras/mixed_precision/experimental/LossScaleOptimizer) to learn more.
 
 ```python
 opt = tf.keras.mixed_precision.experimental.LossScaleOptimizer(opt, "dynamic")
@@ -103,8 +101,6 @@ BERT has a large number of parameters (110M or 330M), which makes it important t
 <p align="center">
   <img src="https://raw.githubusercontent.com/NVAITC/bert-finetune/master/images/bert_scaling.jpg" width="80%">
 </p>
-
-`(TODO: Replace outdated image above)`
 
 >If you are new to Horovod or distributed training, please view:
 >* [Basic Horovod MPI concepts](https://github.com/horovod/horovod/blob/master/docs/concepts.rst)
@@ -124,6 +120,8 @@ optimizer = hvd_keras.DistributedOptimizer(optimizer,
   <img src="https://raw.githubusercontent.com/NVAITC/bert-finetune/master/images/bertlarge_hvd_perf.jpg" width="49%">
 </p>
 
+Due to the relatively large proportion of parameters being from the Embedding layer, `sparse_as_dense` results in a significant performance boost for BERTBASE, and increases the average NVLink bandwidth significantly for both models. This also results in increase VRAM usage by Horovod as it allocates more VRAM for the allreduce operations. To reduce the required VRAM as well as communication bandwidth, we use FP16 compression. Finally, this also allows us to increase the batch size. Hence, we obtain a dramatic performance increase over the baseline performance (already using XLA+AMP).
+
 <p align="center">
   <img src="https://raw.githubusercontent.com/NVAITC/bert-finetune/master/images/bertbase_params.jpg" width="49%">
   <img src="https://raw.githubusercontent.com/NVAITC/bert-finetune/master/images/bertlarge_params.jpg" width="49%">
@@ -131,14 +129,14 @@ optimizer = hvd_keras.DistributedOptimizer(optimizer,
 
 **Impact of NVLink Interconnect (DGX-1V)**
 
-When we disable NVLink during model training (`-x NCCL_P2P_DISABLE=1`), communication takes place exclusively over the PCIE bus and training performance drops anywhere from 16% (BERTBASE) up to 44% (BERTLARGE) for the otherwise fully optimized training routine (FP16 compression, `sparse_as_dense=True`, XLA+AMP). 
+When we disable NVLink during model training (`-x NCCL_P2P_DISABLE=1`), communication takes place exclusively over the PCIE bus and training performance drops anywhere from 16% to 44% for the otherwise fully optimized training routine (FP16 compression, `sparse_as_dense=True`, XLA+AMP). 
 
 On a DGX-1V (Max-Q mode) with 32GB V100:
 
-| Model     | With NVLink | Without NVLink | Slowdown |
-| --------- | ----------- | -------------- | -------- |
-| BERTBASE  | 719         | 618            | 16%      |
-| BERTLARGE | 206         | 143            | 44%      |
+| Model     | With NVLink    | Without NVLink | Slowdown |
+| --------- | -------------- | -------------- | -------- |
+| BERTBASE  | 719 examples/s | 618 examples/s | 16%      |
+| BERTLARGE | 206 examples/s | 143 examples/s | 44%      |
 
 ### Additional Optimizations
 
@@ -152,14 +150,14 @@ LazyAdam provides an inconsistent performance boost (depending on model/training
 
 **Efficiency of GPU kernels**
 
-SOL (Speed Of Light) refers to the theoretical throughput of the GPU. We are able to measure SOL for the individual kernels used during the training process using NSight Compute. Below are the top 3 GPU kernels used and their SOL for compute and memory. There are about 1000+ other kernels (most generated by XLA) that occupy <1% of time each. The XLA kernels tend to show very good SOL memory, but poor SOL compute.
+SOL (Speed Of Light) refers to the theoretical throughput of the GPU. We are able to measure SOL for the individual kernels used during the training process using NSight Compute. Below are the top 3 GPU kernels used and their SOL for compute and memory. There are about 1000+ other kernels (many generated by XLA) that occupy 2% or much less time each. A general observation is that XLA fusion kernels tend to show very good SOL memory, but poor SOL compute.
 
 | Kernel | Time | %SOL Compute | %SOL Memory |
 | ------ | ---- | ------------ | ----------- |
-| volta_fp16_s884gemm_fp16_256x128_ldg8_f2f_nn | 16% | 8.75  | 11.04 |
-| volta_fp16_s884gemm_fp16_128x256_ldg8_f2f_tn | 14%  | 4.35  | 5.84  |
-| volta_fp16_s884gemm_fp16_256x128_ldg8_f2f_nt | 13%  | 12.54 | 15.74 |
-| **Top 3 Kernels**                            | **43%** | **8.45** | **10.47** |
+| `volta_fp16_s884gemm_fp16_256x128_ldg8_f2f_nn` | 16% | 8.75  | 11.04 |
+| `volta_fp16_s884gemm_fp16_128x256_ldg8_f2f_tn` | 14%  | 4.35  | 5.84  |
+| `volta_fp16_s884gemm_fp16_256x128_ldg8_f2f_nt` | 13%  | 12.54 | 15.74 |
+| **Top 3 Kernels**                              | **43%** | **8.45** | **10.47** |
 
 We are also able to estimate the model FLOPS during training using [this notebook](model_flops.ipynb). This estimate is a lower-bound, as there are some operations that are not accounted for due to lack of information on input shape etc. 
 
@@ -197,7 +195,7 @@ bash -c 'export N_GPU=8 && git clone --depth 1 https://github.com/NVAITC/bert-fi
 
 To get better classification performance, we use learning rate warmup followed by learning rate decay.
 
-Note: As of TF 1.14, learning rate scheduling requires our [custom patch of TensorFlow](https://github.com/NVAITC/tensorflow-patched/releases/tag/v1.14.1-patch0). If you're using our container [`nvaitc/ai-lab:19.07`](https://cloud.docker.com/u/nvaitc/repository/docker/nvaitc/ai-lab) or newer, the patch is already included.
+Note: As of TF 1.14, learning rate scheduling requires our [custom patch of TensorFlow](https://github.com/NVAITC/tensorflow-patched/releases/tag/1.14.0-patchnv1). If you're using our container [`nvaitc/ai-lab:19.08`](https://cloud.docker.com/u/nvaitc/repository/docker/nvaitc/ai-lab) or newer, the patch is already included.
 
 ## Future Work
 
