@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
-# scaling
+# for internal use
+
+# scaling tests
 
 ngc batch run --name "Benchmark BERTBASE 1 32GB" \
 --preempt RUNONCE --total-runtime 100000s --image "nvidian/sae/ai-lab:19.08-tf" --ace nv-us-west-2 --instance dgx1v.32g.1.norm --commandline \

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
-# TF Performance Features
+# for internal use
+
+# TF Performance tests
 
 ngc batch run --name "Benchmark BERTBASE TF 16GB" \
 --preempt RUNONCE --total-runtime 100000s --image "nvidian/sae/ai-lab:19.08-tf" --ace nv-us-west-2 --instance dgx1v.16g.8.norm --commandline \

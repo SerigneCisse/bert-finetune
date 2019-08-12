@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
-# HVD features
+# for internal use
+
+# HVD tests
 
 ngc batch run --name "Benchmark BERTBASE HVD 16GB" \
 --preempt RUNONCE --total-runtime 100000s --image "nvidian/sae/ai-lab:19.08-tf" --ace nv-us-west-2 --instance dgx1v.16g.8.norm --commandline \

@@ -137,10 +137,10 @@ On a DGX-1V (Max-Q mode) with 32GB V100:
 
 | Model     | Avg NVLink BW | With NVLink    | Without NVLink | Slowdown |
 | --------- | ------------- | -------------- | -------------- | -------- |
-| BERTBASE  | 3 GB/s        | 719 examples/s | 618 examples/s | 16%      |
-| BERTLARGE | 10 GB/s       | 206 examples/s | 143 examples/s | 44%      |
+| BERTBASE  | 4 GB/s        | 719 examples/s | 618 examples/s | 16%      |
+| BERTLARGE | 19 GB/s       | 206 examples/s | 143 examples/s | 44%      |
 
-This also leads us to the conclusion that in order for inter-node network bandwidth (not tested) to not be a bottleneck, we require at least 25-gigabit (BERTBASE) or 100-gigabit networking (BERTLARGE). 
+This also leads us to the conclusion that in order for inter-node network bandwidth (not tested) to not be a bottleneck, we require at least 50-gigabit (BERTBASE) or bonded 2×100-gigabit networking (BERTLARGE). 
 
 ### Additional Optimizations
 
@@ -187,7 +187,13 @@ SOL (Speed Of Light) refers to the theoretical throughput of the GPU. We are abl
 | `volta_fp16_s884gemm_fp16_64x64_ldg8_f2f_nt`   | 2%  | 31.84 | 53.02 |
 | **Top 6 Kernels**                              | **49%** | **39.77** | **40.05** |
 
-The way to interprete the kernel names are `[arch]_[output_type]_[s|h][gemm|cudnn]_[input_type]_[MxN]_[opt]_[n|t][n|t]`. In particular:
+The way to interprete the kernel names are:
+
+```
+[arch]_[output_type]_[s|h][gemm|cudnn]_[input_type]_[MxN]_[opt]_[n|t][n|t]
+```
+
+In particular:
 
 * `884gemm` indicates Tensor Cores (**884**) matrix-multiply (**gemm**)
 * `[s|h]` before `gemm` indicates **s**ingle (FP32) or **h**alf precision (FP16) accumulate

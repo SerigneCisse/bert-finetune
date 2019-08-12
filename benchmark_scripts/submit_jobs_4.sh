@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
-# others
+# for internal use
+
+# other tests
 
 ngc batch run --name "Benchmark BERTBASE no NVLINK" \
 --preempt RUNONCE --total-runtime 10000s --image "nvidian/sae/ai-lab:19.08-tf" --ace nv-us-west-2 --instance dgx1v.32g.8.norm --commandline \
