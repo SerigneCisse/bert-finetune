@@ -196,6 +196,13 @@ log = model.fit([train_input_ids, train_input_masks, train_segment_ids],
 
 # In[ ]:
 
+best_loss = min(log.history["val_loss"])
+best_loss_index = log.history["val_loss"].index(best_loss)
+acc = log.history["val_acc"][best_loss_index]
+
+score = str(best_loss) + "-" + str(acc)
 
 pickle.dump(log.history, open("/results/history.pickle", "wb"))
 
+with open("/results/"+score, 'a') as out:
+    out.write(score + '\n')
