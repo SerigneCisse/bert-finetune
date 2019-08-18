@@ -83,7 +83,7 @@ train_text, train_label, num_classes = utils.load_ag_news_dataset(max_seq_len=MA
                                                                   test=False)
 
 num_examples = int(len(train_label) * DATASET_PORTION)
-_, train_text, _, train_label= train_test_split(train_text, train_label, test_size=0.01, stratify=train_label)
+_, train_text, _, train_label= train_test_split(train_text, train_label, test_size=DATASET_PORTION, stratify=train_label)
 
 train_label = np.asarray(train_label)
 train_examples = bert_utils.convert_text_to_examples(train_text, train_label)
