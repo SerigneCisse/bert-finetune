@@ -1,9 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[ ]:
-
-
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -25,10 +19,6 @@ import utils
 import bert_utils
 import bert_optimizer
 
-
-# In[ ]:
-
-
 BERTLARGE     = False
 USE_AMP       = True
 USE_XLA       = True
@@ -38,20 +28,12 @@ TUNE_LAYERS   = -1
 
 DATASET_PORTION = float(os.environ["DATASET_PORTION"])
 
-
-# In[ ]:
-
-
 if BERTLARGE:
     BERT_PATH = "https://tfhub.dev/google/bert_uncased_L-24_H-1024_A-16/1"
     H_SIZE = 1024
 else:
     BERT_PATH = "https://tfhub.dev/google/bert_uncased_L-12_H-768_A-12/1"
     H_SIZE = 768
-
-
-# In[ ]:
-
 
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
@@ -65,25 +47,18 @@ config.graph_options.rewrite_options.auto_mixed_precision = USE_AMP
 sess = tf.Session(config=config)
 tf.keras.backend.set_session(sess)
 
-
 # ### Create Tokenizer
-
-# In[ ]:
-
 
 tokenizer = bert_utils.create_tokenizer_from_hub_module(BERT_PATH, sess)
 
-
 # ### Preprocess Data
-
-# In[ ]:
-
 
 train_text, train_label, num_classes = utils.load_ag_news_dataset(max_seq_len=MAX_SEQ_LEN,
                                                                   test=False)
 
-num_examples = int(len(train_label) * DATASET_PORTION)
-_, train_text, _, train_label= train_test_split(train_text, train_label, test_size=DATASET_PORTION, stratify=train_label)
+if DATASET_PORTION < 1:
+    num_examples = int(len(train_label) * DATASET_PORTION)
+    _, train_text, _, train_label= train_test_split(train_text, train_label, test_size=DATASET_PORTION, stratify=train_label)
 
 train_label = np.asarray(train_label)
 train_examples = bert_utils.convert_text_to_examples(train_text, train_label)
@@ -91,15 +66,11 @@ train_examples = bert_utils.convert_text_to_examples(train_text, train_label)
 feat = bert_utils.convert_examples_to_features(tokenizer,
                                                train_examples,
                                                max_seq_length=MAX_SEQ_LEN,
-                                               verbose=True)
+                                               verbose=False)
 
 (train_input_ids, train_input_masks, train_segment_ids, train_labels) = feat
 
 print("Number of training examples:", len(train_labels))
-
-
-# In[ ]:
-
 
 examples, labels, num_classes = utils.load_ag_news_dataset(max_seq_len=MAX_SEQ_LEN,
                                                            test=True)
@@ -108,7 +79,7 @@ test_examples = bert_utils.convert_text_to_examples(examples, labels)
 feat = bert_utils.convert_examples_to_features(tokenizer,
                                                test_examples,
                                                max_seq_length=MAX_SEQ_LEN,
-                                               verbose=True)
+                                               verbose=False)
 
 (test_input_ids, test_input_masks, test_segment_ids, test_labels) = feat
 
@@ -119,11 +90,7 @@ test_input_ids, test_input_masks, test_segment_ids, test_labels = shuffle(test_i
 
 test_set = ([test_input_ids, test_input_masks, test_segment_ids], test_labels)
 
-
 # ## Build Keras Model
-
-# In[ ]:
-
 
 if USE_AMP:
     tf.keras.mixed_precision.experimental.set_policy('infer_float32_vars')
@@ -144,34 +111,18 @@ out_pred = layers.Dense(num_classes, activation="softmax")(l_bert)
 
 model = tf.keras.models.Model(inputs=in_bert, outputs=out_pred)
 
-
-# In[ ]:
-
-
 opt = tf.keras.optimizers.Adam(lr=LEARNING_RATE)
 
 if USE_AMP:
     opt = tf.keras.mixed_precision.experimental.LossScaleOptimizer(opt, "dynamic")
 
-
-# In[ ]:
-
-
 model.compile(loss="sparse_categorical_crossentropy",
               optimizer=opt,
               metrics=["accuracy"])
 
-
-# In[ ]:
-
-
 model.summary()
 
-
 # ## Train Model
-
-# In[ ]:
-
 
 def scheduler(epoch):
     warmup_steps = 26000
@@ -182,27 +133,46 @@ def scheduler(epoch):
         return LEARNING_RATE
 
 lr_schedule = tf.keras.callbacks.LearningRateScheduler(scheduler)
+early_stop = tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=5, restore_best_weights=True)
 
-
-# In[ ]:
-
+callbacks_list = [lr_schedule, early_stop]
 
 log = model.fit([train_input_ids, train_input_masks, train_segment_ids],
                 train_labels, validation_data=test_set,
                 workers=4, use_multiprocessing=True,
-                verbose=2, callbacks=[lr_schedule],
+                verbose=2, callbacks=callbacks_list,
                 epochs=50, batch_size=56)
 
+[eval_loss, eval_acc] = model.evaluate([test_input_ids, test_input_masks, test_segment_ids], test_labels, verbose=2, batch_size=112)
 
-# In[ ]:
+print("Loss:", eval_loss, "Acc:", eval_acc)
 
-best_loss = min(log.history["val_loss"])
-best_loss_index = log.history["val_loss"].index(best_loss)
-acc = log.history["val_acc"][best_loss_index]
+train_text, train_label, num_classes = utils.load_ag_news_dataset(max_seq_len=MAX_SEQ_LEN,
+                                                                  test=False)
 
-score = str(best_loss) + "-" + str(acc)
+train_label = np.asarray(train_label)
+train_examples = bert_utils.convert_text_to_examples(train_text, train_label)
 
-pickle.dump(log.history, open("/results/history.pickle", "wb"))
+feat = bert_utils.convert_examples_to_features(tokenizer,
+                                               train_examples,
+                                               max_seq_length=MAX_SEQ_LEN,
+                                               verbose=False)
 
-with open("/results/"+score, 'a') as out:
-    out.write(score + '\n')
+print("Number of training examples:", len(train_labels))
+
+y_pred = model.predict([train_input_ids, train_input_masks, train_segment_ids], verbose=2, batch_size=112)
+y_pred_class = np.argmax(y_pred, axis=1)
+y_pred_class = y_pred_class.reshape(y_pred_class.shape[0], 1).shape
+
+#pickle.dump(feat, open("./dataset.pickle", "wb"))
+
+log = model.fit([train_input_ids, train_input_masks, train_segment_ids],
+                y_pred_class, validation_data=test_set,
+                workers=4, use_multiprocessing=True,
+                verbose=2, callbacks=callbacks_list,
+                epochs=50, batch_size=56)
+
+[eval_loss, eval_acc] = model.evaluate([test_input_ids, test_input_masks, test_segment_ids], test_labels, verbose=2, batch_size=112)
+
+print("End!")
+print("Loss:", eval_loss, "Acc:", eval_acc)
