@@ -137,6 +137,9 @@ early_stop = tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=5, re
 
 callbacks_list = [lr_schedule, early_stop]
 
+print("PHASE 1:")
+print("Train on 'golden' portion of dataset")
+
 log = model.fit([train_input_ids, train_input_masks, train_segment_ids],
                 train_labels, validation_data=test_set,
                 workers=4, use_multiprocessing=True,
@@ -146,6 +149,9 @@ log = model.fit([train_input_ids, train_input_masks, train_segment_ids],
 [eval_loss, eval_acc] = model.evaluate([test_input_ids, test_input_masks, test_segment_ids], test_labels, verbose=2, batch_size=112)
 
 print("Loss:", eval_loss, "Acc:", eval_acc)
+
+print("PHASE 2:")
+print("Load and label whole dataset")
 
 train_text, train_label, num_classes = utils.load_ag_news_dataset(max_seq_len=MAX_SEQ_LEN,
                                                                   test=False)
@@ -158,6 +164,8 @@ feat = bert_utils.convert_examples_to_features(tokenizer,
                                                max_seq_length=MAX_SEQ_LEN,
                                                verbose=False)
 
+(train_input_ids, train_input_masks, train_segment_ids, train_labels) = feat    
+
 print("Number of training examples:", len(train_labels))
 
 y_pred = model.predict([train_input_ids, train_input_masks, train_segment_ids], verbose=2, batch_size=112)
@@ -165,6 +173,9 @@ y_pred_class = np.argmax(y_pred, axis=1)
 y_pred_class = y_pred_class.reshape(y_pred_class.shape[0], 1).shape
 
 #pickle.dump(feat, open("./dataset.pickle", "wb"))
+
+print("PHASE 3:")
+print("Train model on labelled dataset")
 
 log = model.fit([train_input_ids, train_input_masks, train_segment_ids],
                 y_pred_class, validation_data=test_set,
