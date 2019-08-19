@@ -157,7 +157,7 @@ else:
     # use pre-determined batch size for current task
     if utils.get_gpu_vram() > 17000:
         if args.bertlarge:
-            BATCH_SIZE = 16
+            BATCH_SIZE = 15
         else:
             BATCH_SIZE = 57
     else:
