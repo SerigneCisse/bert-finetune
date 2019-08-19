@@ -84,8 +84,9 @@ def load_ag_news_dataset(max_seq_len=512, test=False):
 
 
 def load_dbpedia_dataset(max_seq_len=512, test=False):
-    """The DBpedia ontology classification dataset. 14 non-overlapping classes from DBpedia 2014.
-    40,000 training samples and 5,000 testing samples.
+    """The DBpedia ontology classification dataset.
+    14 non-overlapping classes from DBpedia 2014.
+    40,000 training samples and 5,000 testing samples per class.
     https://wiki.dbpedia.org/data-set-2014
     """
     filename = "dbpedia.zip"
