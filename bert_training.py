@@ -59,6 +59,8 @@ train_text, train_label, num_classes = utils.load_ag_news_dataset(max_seq_len=MA
 if DATASET_PORTION < 1:
     num_examples = int(len(train_label) * DATASET_PORTION)
     _, train_text, _, train_label= train_test_split(train_text, train_label, test_size=DATASET_PORTION, stratify=train_label)
+else:
+    num_examples = len(train_label)
 
 train_label = np.asarray(train_label)
 train_examples = bert_utils.convert_text_to_examples(train_text, train_label)
