@@ -146,7 +146,7 @@ log = model.fit([train_input_ids, train_input_masks, train_segment_ids],
                 train_labels, validation_data=test_set,
                 workers=4, use_multiprocessing=True,
                 verbose=2, callbacks=callbacks_list,
-                epochs=100, batch_size=56)
+                epochs=1000, batch_size=56)
 
 [eval_loss, eval_acc] = model.evaluate([test_input_ids, test_input_masks, test_segment_ids], test_labels, verbose=2, batch_size=112)
 
@@ -170,22 +170,24 @@ feat = bert_utils.convert_examples_to_features(tokenizer,
 
 print("Number of training examples:", len(train_labels))
 
-y_pred = model.predict([train_input_ids, train_input_masks, train_segment_ids], verbose=2, batch_size=112)
-y_pred_class = np.argmax(y_pred, axis=1)
-y_pred_class = y_pred_class.reshape(y_pred_class.shape[0], 1)
-
-#pickle.dump(feat, open("./dataset.pickle", "wb"))
-
 print("PHASE 3:")
 print("Train model on labelled dataset")
 
-log = model.fit([train_input_ids, train_input_masks, train_segment_ids],
-                y_pred_class, validation_data=test_set,
-                workers=4, use_multiprocessing=True,
-                verbose=2, callbacks=callbacks_list,
-                epochs=50, batch_size=56)
+for i in range(5):
+    print("\nIteration " + str(i) + " :\n")
 
-[eval_loss, eval_acc] = model.evaluate([test_input_ids, test_input_masks, test_segment_ids], test_labels, verbose=2, batch_size=112)
+    y_pred = model.predict([train_input_ids, train_input_masks, train_segment_ids], verbose=2, batch_size=112)
+    y_pred_class = np.argmax(y_pred, axis=1)
+    y_pred_class = y_pred_class.reshape(y_pred_class.shape[0], 1)
+
+    log = model.fit([train_input_ids, train_input_masks, train_segment_ids],
+                    y_pred_class, validation_data=test_set,
+                    workers=4, use_multiprocessing=True,
+                    verbose=2, callbacks=callbacks_list,
+                    epochs=50, batch_size=56)
+
+    [eval_loss, eval_acc] = model.evaluate([test_input_ids, test_input_masks, test_segment_ids], test_labels, verbose=2, batch_size=112)
+
+    print("Loss:", eval_loss, "Acc:", eval_acc)
 
 print("End!")
-print("Loss:", eval_loss, "Acc:", eval_acc)
