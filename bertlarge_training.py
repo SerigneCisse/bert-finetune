@@ -146,9 +146,9 @@ log = model.fit([train_input_ids, train_input_masks, train_segment_ids],
                 train_labels, validation_data=test_set,
                 workers=4, use_multiprocessing=True,
                 verbose=2, callbacks=callbacks_list,
-                epochs=1000, batch_size=32)
+                epochs=1000, batch_size=12)
 
-[eval_loss, eval_acc] = model.evaluate([test_input_ids, test_input_masks, test_segment_ids], test_labels, verbose=2, batch_size=32)
+[eval_loss, eval_acc] = model.evaluate([test_input_ids, test_input_masks, test_segment_ids], test_labels, verbose=2, batch_size=12)
 
 print("Loss:", eval_loss, "Acc:", eval_acc)
 
@@ -190,7 +190,7 @@ callbacks_list = [lr_schedule, early_stop]
 for i in range(5):
     print("\nIteration " + str(i) + " :\n")
 
-    y_pred = model.predict([train_input_ids, train_input_masks, train_segment_ids], verbose=2, batch_size=32)
+    y_pred = model.predict([train_input_ids, train_input_masks, train_segment_ids], verbose=2, batch_size=12)
     y_pred_class = np.argmax(y_pred, axis=1)
     y_pred_class = y_pred_class.reshape(y_pred_class.shape[0], 1)
 
@@ -198,9 +198,9 @@ for i in range(5):
                     y_pred_class, validation_data=test_set,
                     workers=4, use_multiprocessing=True,
                     verbose=2, callbacks=callbacks_list,
-                    epochs=50, batch_size=32)
+                    epochs=50, batch_size=12)
 
-    [eval_loss, eval_acc] = model.evaluate([test_input_ids, test_input_masks, test_segment_ids], test_labels, verbose=2, batch_size=32)
+    [eval_loss, eval_acc] = model.evaluate([test_input_ids, test_input_masks, test_segment_ids], test_labels, verbose=2, batch_size=12)
 
     print("Loss:", eval_loss, "Acc:", eval_acc)
 
