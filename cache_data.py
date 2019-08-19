@@ -16,6 +16,10 @@ parser.add_argument("--agnews",
                     help="Cache AG News Dataset",
                     action="store_true")
 
+parser.add_argument("--dbpedia",
+                    help="Cache dbpedia Dataset",
+                    action="store_true")
+
 args = parser.parse_args()
 
 import os
@@ -72,4 +76,11 @@ if args.agnews:
     filename = "ag_news.zip"
     dataset_path = tf.keras.utils.get_file(filename,
                                            "https://deeplearning-mat.s3-ap-southeast-1.amazonaws.com/ag_news.zip",
+                                           cache_subdir='datasets', extract=True)
+
+if args.dbpedia:
+    print("[INFO ] Caching AG News Dataset")
+    filename = "dbpedia.zip"
+    dataset_path = tf.keras.utils.get_file(filename,
+                                           "https://deeplearning-mat.s3-ap-southeast-1.amazonaws.com/dbpedia.zip",
                                            cache_subdir='datasets', extract=True)

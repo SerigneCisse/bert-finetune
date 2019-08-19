@@ -96,7 +96,7 @@ else:
 if args.maxseqlen:
     MAX_SEQ_LEN = args.maxseqlen
 else:
-    MAX_SEQ_LEN = 128
+    MAX_SEQ_LEN = 512
     
 import os
 from pathlib import Path
@@ -139,7 +139,7 @@ if RESULTS_DIR[-1] != "/":
 
 if hvd.rank() == 0:
     utils.ensure_dir(RESULTS_DIR)
-    utils.ensure_dir("./cache/")
+    utils.ensure_dir("./dbpedia/")
 else:
     time.sleep(0.5)
 
@@ -157,14 +157,14 @@ else:
     # use pre-determined batch size for current task
     if utils.get_gpu_vram() > 17000:
         if args.bertlarge:
-            BATCH_SIZE = 20
+            BATCH_SIZE = 16
         else:
-            BATCH_SIZE = 128
+            BATCH_SIZE = 57
     else:
         if args.bertlarge:
-            BATCH_SIZE = 8
+            BATCH_SIZE = 3
         else:
-            BATCH_SIZE = 64
+            BATCH_SIZE = 23
 
 # ====================================================
 # Create TensorFlow Session before loading BERT module
@@ -200,14 +200,14 @@ if hvd.rank() == 0:
 else:
     print_progress = False
     
-train_text, train_label, num_classes = utils.load_ag_news_dataset(max_seq_len=MAX_SEQ_LEN,
+train_text, train_label, num_classes = utils.load_dbpedia_dataset(max_seq_len=MAX_SEQ_LEN,
                                                                   test=False)
 
 # load, preprocess and save data to pickle
 
 # training set
 
-train_feat_cache = "./cache/train_feat.pickle."+str(hvd.rank())
+train_feat_cache = "./dbpedia/train_feat.pickle."+str(hvd.rank())
 train_feat = Path(train_feat_cache)
 
 if train_feat.is_file():
@@ -248,13 +248,13 @@ if args.profiling:
     
 # test set
 
-test_feat_cache = "./cache/test_feat.pickle."+str(hvd.rank())
+test_feat_cache = "./dbpedia/test_feat.pickle."+str(hvd.rank())
 test_feat = Path(test_feat_cache)
 
 if test_feat.is_file():
     feat = pickle.load(open(test_feat_cache, "rb"))
 else:
-    examples, labels, num_classes = utils.load_ag_news_dataset(max_seq_len=MAX_SEQ_LEN,
+    examples, labels, num_classes = utils.load_dbpedia_dataset(max_seq_len=MAX_SEQ_LEN,
                                                                test=True)
     examples, labels = utils.shard_dataset(examples, labels, hvd)
     labels = np.asarray(labels)

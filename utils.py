@@ -93,7 +93,7 @@ def load_dbpedia_dataset(max_seq_len=512, test=False):
                                            "https://deeplearning-mat.s3-ap-southeast-1.amazonaws.com/dbpedia.zip",
                                            cache_subdir='datasets', extract=True)
 
-    dataset_path = dataset_path.replace(".zip", "")
+    dataset_path = dataset_path.replace(".zip", "_csv")
 
     try:
         if test:
