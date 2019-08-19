@@ -146,7 +146,7 @@ log = model.fit([train_input_ids, train_input_masks, train_segment_ids],
                 train_labels, validation_data=test_set,
                 workers=4, use_multiprocessing=True,
                 verbose=2, callbacks=callbacks_list,
-                epochs=50, batch_size=56)
+                epochs=100, batch_size=56)
 
 [eval_loss, eval_acc] = model.evaluate([test_input_ids, test_input_masks, test_segment_ids], test_labels, verbose=2, batch_size=112)
 
