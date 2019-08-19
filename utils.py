@@ -78,7 +78,81 @@ def load_ag_news_dataset(max_seq_len=512, test=False):
     else:
         print("Loaded training set from:", dataset_path)
     print("Examples:", len(examples), "Classes:", num_classes)
-    #print(stats.describe(np.asarray(len_list)))
+    print(stats.describe(np.asarray(len_list)))
+    
+    return examples, labels, num_classes
+
+
+def load_dbpedia_dataset(max_seq_len=512, test=False):
+    """The DBpedia ontology classification dataset. 14 non-overlapping classes from DBpedia 2014.
+    40,000 training samples and 5,000 testing samples.
+    https://wiki.dbpedia.org/data-set-2014
+    """
+    filename = "dbpedia.zip"
+    dataset_path = tf.keras.utils.get_file(filename,
+                                           "https://deeplearning-mat.s3-ap-southeast-1.amazonaws.com/dbpedia.zip",
+                                           cache_subdir='datasets', extract=True)
+
+    dataset_path = dataset_path.replace(".zip", "")
+
+    try:
+        if test:
+            df = pd.read_csv(dataset_path+"/test.csv",
+                             names=["label", "title", "article"], header=None)
+        else:
+            df = pd.read_csv(dataset_path+"/train.csv",
+                             names=["label", "title", "article"], header=None)
+            
+    except Exception as e:
+        print("Encounter weird pandas race condition", e)
+        time.sleep(1)
+        print("Attempting to read data again")
+        if test:
+            df = pd.read_csv(dataset_path+"/test.csv",
+                             names=["label", "title", "article"], header=None)
+        else:
+            df = pd.read_csv(dataset_path+"/train.csv",
+                             names=["label", "title", "article"], header=None)
+
+    if test:
+        titles = df["title"].tolist()
+        raw_examples = df["article"].tolist()
+    else:
+        titles = df["title"].tolist()
+        raw_examples = df["article"].tolist()
+    
+    examples = []
+    len_list = []
+    for i, raw in enumerate(raw_examples):
+        raw = " ".join([str(titles[i]), str(raw)])
+        raw = raw.replace("  ", " ").split(" ")
+        len_list.append(len(raw))
+        if len(raw) > max_seq_len:
+            raw_cmb = raw[:max_seq_len//2] + raw[:-max_seq_len//2]
+            raw = raw_cmb
+        output = " ".join(raw)
+        examples.append(output)
+    examples = [" ".join(t.split(" ")[:max_seq_len]) for t in examples]
+    examples = np.array(examples, dtype=object)[:, np.newaxis]
+
+    if test:
+        labels = df["label"].tolist()
+    else:
+        labels = df["label"].tolist()
+    
+    # map labels (1 ~ x) to classes (0 ~ x-1)
+    labels = np.asarray(labels) - 1
+
+    examples, labels = shuffle(examples, labels)
+
+    num_classes = len(set(labels))
+
+    if test:
+        print("Loaded test set from:", dataset_path)
+    else:
+        print("Loaded training set from:", dataset_path)
+    print("Examples:", len(examples), "Classes:", num_classes)
+    print(stats.describe(np.asarray(len_list)))
     
     return examples, labels, num_classes
 
