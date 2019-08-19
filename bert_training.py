@@ -172,7 +172,7 @@ print("Number of training examples:", len(train_labels))
 
 y_pred = model.predict([train_input_ids, train_input_masks, train_segment_ids], verbose=2, batch_size=112)
 y_pred_class = np.argmax(y_pred, axis=1)
-y_pred_class = y_pred_class.reshape(y_pred_class.shape[0], 1).shape
+y_pred_class = y_pred_class.reshape(y_pred_class.shape[0], 1)
 
 #pickle.dump(feat, open("./dataset.pickle", "wb"))
 
