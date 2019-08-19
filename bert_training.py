@@ -23,7 +23,7 @@ BERTLARGE     = False
 USE_AMP       = True
 USE_XLA       = True
 MAX_SEQ_LEN   = 128
-LEARNING_RATE = 2e-5
+LEARNING_RATE = 1e-5
 TUNE_LAYERS   = -1
 
 DATASET_PORTION = float(os.environ["DATASET_PORTION"])
@@ -172,6 +172,20 @@ print("Number of training examples:", len(train_labels))
 
 print("PHASE 3:")
 print("Train model on labelled dataset")
+
+LEARNING_RATE = 1e-6
+
+def scheduler_2(epoch):
+    warmup_epochs = 1
+    if epoch < warmup_epochs:
+        return LEARNING_RATE*(epoch/warmup_epochs)
+    else:
+        return LEARNING_RATE
+
+lr_schedule = tf.keras.callbacks.LearningRateScheduler(scheduler_2)
+early_stop = tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=3, restore_best_weights=True)
+
+callbacks_list = [lr_schedule, early_stop]
 
 for i in range(5):
     print("\nIteration " + str(i) + " :\n")
