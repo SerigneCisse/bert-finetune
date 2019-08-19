@@ -159,12 +159,12 @@ else:
         if args.bertlarge:
             BATCH_SIZE = 15
         else:
-            BATCH_SIZE = 57
+            BATCH_SIZE = 56
     else:
         if args.bertlarge:
             BATCH_SIZE = 3
         else:
-            BATCH_SIZE = 23
+            BATCH_SIZE = 22
 
 # ====================================================
 # Create TensorFlow Session before loading BERT module
@@ -200,7 +200,7 @@ if hvd.rank() == 0:
 else:
     print_progress = False
 
-time.sleep(hvd.rank()/4)
+time.sleep(hvd.rank())
 
 train_text, train_label, num_classes = utils.load_dbpedia_dataset(max_seq_len=MAX_SEQ_LEN,
                                                                   test=False)
