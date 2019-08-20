@@ -329,7 +329,7 @@ else:
 if args.lr:
     LEARNING_RATE = args.lr
 else:
-    LEARNING_RATE = 3e-5
+    LEARNING_RATE = 2e-5
     
 opt = tf.keras.optimizers.Adam(lr=LEARNING_RATE)
 
