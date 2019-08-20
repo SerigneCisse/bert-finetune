@@ -24,10 +24,10 @@ def load_ag_news_dataset(max_seq_len=512, test=False):
     try:
         if test:
             df = pd.read_csv(dataset_path+"/test.csv",
-                             names=["label", "title", "article"], header=None)
+                             names=["label", "title", "article"], header=None, engine="python")
         else:
             df = pd.read_csv(dataset_path+"/train.csv",
-                             names=["label", "title", "article"], header=None)
+                             names=["label", "title", "article"], header=None, engine="python")
             
     except Exception as e:
         print("Encounter weird pandas race condition", e)
@@ -35,10 +35,10 @@ def load_ag_news_dataset(max_seq_len=512, test=False):
         print("Attempting to read data again")
         if test:
             df = pd.read_csv(dataset_path+"/test.csv",
-                             names=["label", "title", "article"], header=None)
+                             names=["label", "title", "article"], header=None, engine="python")
         else:
             df = pd.read_csv(dataset_path+"/train.csv",
-                             names=["label", "title", "article"], header=None)
+                             names=["label", "title", "article"], header=None, engine="python")
 
     if test:
         titles = df["title"].tolist()
@@ -99,10 +99,10 @@ def load_dbpedia_dataset(max_seq_len=512, test=False):
     try:
         if test:
             df = pd.read_csv(dataset_path+"/test.csv",
-                             names=["label", "title", "article"], header=None)
+                             names=["label", "title", "article"], header=None, engine="python")
         else:
             df = pd.read_csv(dataset_path+"/train.csv",
-                             names=["label", "title", "article"], header=None)
+                             names=["label", "title", "article"], header=None, engine="python")
             
     except Exception as e:
         print("Encounter weird pandas race condition", e)
@@ -110,10 +110,10 @@ def load_dbpedia_dataset(max_seq_len=512, test=False):
         print("Attempting to read data again")
         if test:
             df = pd.read_csv(dataset_path+"/test.csv",
-                             names=["label", "title", "article"], header=None)
+                             names=["label", "title", "article"], header=None, engine="python")
         else:
             df = pd.read_csv(dataset_path+"/train.csv",
-                             names=["label", "title", "article"], header=None)
+                             names=["label", "title", "article"], header=None, engine="python")
 
     if test:
         titles = df["title"].tolist()
