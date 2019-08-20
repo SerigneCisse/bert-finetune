@@ -7,7 +7,7 @@ from sklearn.utils import shuffle
 import tensorflow.compat.v1 as tf
 
 
-def load_ag_news_dataset(max_seq_len=512, test=False):
+def load_ag_news_dataset(max_seq_len=512, suffix="", test=False):
     """Loads the AG News corpus, which consists of news articles
     from the 4 largest classes in the AG’s corpus of news articles.
     The dataset contains 30,000 training examples for each class
@@ -17,7 +17,7 @@ def load_ag_news_dataset(max_seq_len=512, test=False):
     filename = "ag_news.zip"
     dataset_path = tf.keras.utils.get_file(filename,
                                            "https://deeplearning-mat.s3-ap-southeast-1.amazonaws.com/ag_news.zip",
-                                           cache_subdir='datasets', extract=True)
+                                           cache_subdir='datasets_'+suffix, extract=True)
 
     dataset_path = dataset_path.replace(".zip", "")
 
@@ -83,7 +83,7 @@ def load_ag_news_dataset(max_seq_len=512, test=False):
     return examples, labels, num_classes
 
 
-def load_dbpedia_dataset(max_seq_len=512, test=False):
+def load_dbpedia_dataset(max_seq_len=512, suffix="", test=False):
     """The DBpedia ontology classification dataset.
     14 non-overlapping classes from DBpedia 2014.
     40,000 training samples and 5,000 testing samples per class.
@@ -92,7 +92,7 @@ def load_dbpedia_dataset(max_seq_len=512, test=False):
     filename = "dbpedia.zip"
     dataset_path = tf.keras.utils.get_file(filename,
                                            "https://deeplearning-mat.s3-ap-southeast-1.amazonaws.com/dbpedia.zip",
-                                           cache_subdir='datasets', extract=True)
+                                           cache_subdir='datasets_'+suffix, extract=True)
 
     dataset_path = dataset_path.replace(".zip", "_csv")
 

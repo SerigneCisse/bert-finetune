@@ -200,9 +200,10 @@ if hvd.rank() == 0:
 else:
     print_progress = False
 
-time.sleep(hvd.rank()+1)
+time.sleep(hvd.rank())
 
 train_text, train_label, num_classes = utils.load_dbpedia_dataset(max_seq_len=MAX_SEQ_LEN,
+                                                                  suffix=str(hvd.rank()),
                                                                   test=False)
 
 # load, preprocess and save data to pickle
@@ -257,6 +258,7 @@ if test_feat.is_file():
     feat = pickle.load(open(test_feat_cache, "rb"))
 else:
     examples, labels, num_classes = utils.load_dbpedia_dataset(max_seq_len=MAX_SEQ_LEN,
+                                                               suffix=str(hvd.rank()),
                                                                test=True)
     examples, labels = utils.shard_dataset(examples, labels, hvd)
     labels = np.asarray(labels)
