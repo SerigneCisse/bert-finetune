@@ -200,7 +200,7 @@ if hvd.rank() == 0:
 else:
     print_progress = False
 
-time.sleep(hvd.rank())
+time.sleep(hvd.rank()+1)
 
 train_text, train_label, num_classes = utils.load_dbpedia_dataset(max_seq_len=MAX_SEQ_LEN,
                                                                   test=False)

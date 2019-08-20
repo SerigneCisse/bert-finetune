@@ -24,14 +24,14 @@ def load_ag_news_dataset(max_seq_len=512, test=False):
     try:
         if test:
             df = pd.read_csv(dataset_path+"/test.csv",
-                             names=["label", "title", "article"], header=None, engine="python")
+                             names=["label", "title", "article"], header=None)
         else:
             df = pd.read_csv(dataset_path+"/train.csv",
-                             names=["label", "title", "article"], header=None, engine="python")
+                             names=["label", "title", "article"], header=None)
             
     except Exception as e:
         print("Encounter weird pandas race condition", e)
-        time.sleep(1)
+        time.sleep(2)
         print("Attempting to read data again")
         if test:
             df = pd.read_csv(dataset_path+"/test.csv",
@@ -99,14 +99,14 @@ def load_dbpedia_dataset(max_seq_len=512, test=False):
     try:
         if test:
             df = pd.read_csv(dataset_path+"/test.csv",
-                             names=["label", "title", "article"], header=None, engine="python")
+                             names=["label", "title", "article"], header=None)
         else:
             df = pd.read_csv(dataset_path+"/train.csv",
-                             names=["label", "title", "article"], header=None, engine="python")
+                             names=["label", "title", "article"], header=None)
             
     except Exception as e:
         print("Encounter weird pandas race condition", e)
-        time.sleep(1)
+        time.sleep(2)
         print("Attempting to read data again")
         if test:
             df = pd.read_csv(dataset_path+"/test.csv",
