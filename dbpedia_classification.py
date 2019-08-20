@@ -157,14 +157,14 @@ else:
     # use pre-determined batch size for current task
     if utils.get_gpu_vram() > 17000:
         if args.bertlarge:
-            BATCH_SIZE = 15
+            BATCH_SIZE = 12
         else:
             BATCH_SIZE = 56
     else:
         if args.bertlarge:
-            BATCH_SIZE = 3
+            BATCH_SIZE = 2
         else:
-            BATCH_SIZE = 22
+            BATCH_SIZE = 21
 
 # ====================================================
 # Create TensorFlow Session before loading BERT module
@@ -329,7 +329,7 @@ else:
 if args.lr:
     LEARNING_RATE = args.lr
 else:
-    LEARNING_RATE = 2e-5
+    LEARNING_RATE = 3e-5
     
 opt = tf.keras.optimizers.Adam(lr=LEARNING_RATE)
 
