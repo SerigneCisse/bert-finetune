@@ -2,7 +2,7 @@
 
 echo -e "\n[INFO ] Caching Data\n"
 
-python3 cache_data.py --dbpedia --bertlarge
+python3 cache_data.py --bertlarge
 
 echo -e "\n[INFO ] Running on $N_GPU GPUs!\n"
 

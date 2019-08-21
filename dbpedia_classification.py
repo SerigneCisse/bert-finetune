@@ -157,14 +157,14 @@ else:
     # use pre-determined batch size for current task
     if utils.get_gpu_vram() > 17000:
         if args.bertlarge:
-            BATCH_SIZE = 15
+            BATCH_SIZE = 8
         else:
             BATCH_SIZE = 56
     else:
         if args.bertlarge:
-            BATCH_SIZE = 3
+            BATCH_SIZE = 2
         else:
-            BATCH_SIZE = 22
+            BATCH_SIZE = 21
 
 # ====================================================
 # Create TensorFlow Session before loading BERT module
@@ -203,6 +203,7 @@ else:
 time.sleep(hvd.rank())
 
 train_text, train_label, num_classes = utils.load_dbpedia_dataset(max_seq_len=MAX_SEQ_LEN,
+                                                                  suffix=str(hvd.rank()),
                                                                   test=False)
 
 # load, preprocess and save data to pickle
@@ -257,6 +258,7 @@ if test_feat.is_file():
     feat = pickle.load(open(test_feat_cache, "rb"))
 else:
     examples, labels, num_classes = utils.load_dbpedia_dataset(max_seq_len=MAX_SEQ_LEN,
+                                                               suffix=str(hvd.rank()),
                                                                test=True)
     examples, labels = utils.shard_dataset(examples, labels, hvd)
     labels = np.asarray(labels)

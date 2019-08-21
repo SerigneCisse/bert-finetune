@@ -79,7 +79,7 @@ if args.agnews:
                                            cache_subdir='datasets', extract=True)
 
 if args.dbpedia:
-    print("[INFO ] Caching AG News Dataset")
+    print("[INFO ] Caching dbpedia Dataset")
     filename = "dbpedia.zip"
     dataset_path = tf.keras.utils.get_file(filename,
                                            "https://deeplearning-mat.s3-ap-southeast-1.amazonaws.com/dbpedia.zip",
