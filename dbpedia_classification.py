@@ -157,7 +157,7 @@ else:
     # use pre-determined batch size for current task
     if utils.get_gpu_vram() > 17000:
         if args.bertlarge:
-            BATCH_SIZE = 8
+            BATCH_SIZE = 10
         else:
             BATCH_SIZE = 56
     else:
@@ -327,7 +327,7 @@ else:
     cmp = hvd_keras.Compression.none
 
 if args.lr:
-    LEARNING_RATE = args.lr
+    LEARNING_RATE = float(args.lr)
 else:
     LEARNING_RATE = 2e-5
     
