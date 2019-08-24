@@ -109,7 +109,8 @@ l_bert = bert_utils.BERT(fine_tune_layers=TUNE_LAYERS,
                          output_size=H_SIZE,
                          debug=False)(in_bert)
 
-out_pred = layers.Dense(num_classes, activation="softmax")(l_bert)
+l_drop = layers.Dropout(rate=0.5)(l_bert)
+out_pred = layers.Dense(num_classes, activation="softmax")(l_drop)
 
 model = tf.keras.models.Model(inputs=in_bert, outputs=out_pred)
 
