@@ -113,7 +113,7 @@ out_pred = layers.Dense(num_classes, activation="softmax")(l_bert)
 
 model = tf.keras.models.Model(inputs=in_bert, outputs=out_pred)
 
-opt = tf.keras.optimizers.Adam(lr=LEARNING_RATE)
+opt = bert_optimizer.RAdam(lr=LEARNING_RATE)
 
 if USE_AMP:
     opt = tf.keras.mixed_precision.experimental.LossScaleOptimizer(opt, "dynamic")
@@ -146,7 +146,7 @@ log = model.fit([train_input_ids, train_input_masks, train_segment_ids],
                 train_labels, validation_data=test_set,
                 workers=4, use_multiprocessing=True,
                 verbose=2, callbacks=callbacks_list,
-                epochs=1000, batch_size=12)
+                epochs=1000, batch_size=8)
 
 [eval_loss, eval_acc] = model.evaluate([test_input_ids, test_input_masks, test_segment_ids], test_labels, verbose=2, batch_size=12)
 
@@ -198,7 +198,7 @@ for i in range(5):
                     y_pred_class, validation_data=test_set,
                     workers=4, use_multiprocessing=True,
                     verbose=2, callbacks=callbacks_list,
-                    epochs=50, batch_size=12)
+                    epochs=50, batch_size=8)
 
     [eval_loss, eval_acc] = model.evaluate([test_input_ids, test_input_masks, test_segment_ids], test_labels, verbose=2, batch_size=12)
 
