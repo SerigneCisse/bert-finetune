@@ -1,4 +1,4 @@
-.vscode
+].vscode
 .keras
 .DS_Store
 .jupyter
@@ -17,3 +17,4 @@
 cache
 cache2
 __pycache__
+dbpedia

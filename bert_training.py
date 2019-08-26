@@ -6,6 +6,7 @@ from pathlib import Path
 import pickle
 import multiprocessing
 import numpy as np
+from scipy import stats
 import pandas as pd
 from sklearn.utils import shuffle
 from sklearn.model_selection import train_test_split
@@ -14,6 +15,8 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 import tensorflow.compat.v1 as tf
 tf.logging.set_verbosity(tf.logging.ERROR)
 from tensorflow.compat.v1.keras import layers
+
+from tqdm import tqdm
 
 import utils
 import bert_utils
@@ -94,22 +97,23 @@ test_set = ([test_input_ids, test_input_masks, test_segment_ids], test_labels)
 
 # ## Build Keras Model
 
+class MCDropout(tf.keras.layers.Dropout):
+    def call(self, inputs):
+        return super().call(inputs, training=True)
+
 if USE_AMP:
     tf.keras.mixed_precision.experimental.set_policy('infer_float32_vars')
 
 in_id = layers.Input(shape=(MAX_SEQ_LEN,), name="input_ids")
 in_mask = layers.Input(shape=(MAX_SEQ_LEN,), name="input_masks")
 in_segment = layers.Input(shape=(MAX_SEQ_LEN,), name="segment_ids")
-
 in_bert = [in_id, in_mask, in_segment]
-
 l_bert = bert_utils.BERT(fine_tune_layers=TUNE_LAYERS,
                          bert_path=BERT_PATH,
                          return_sequence=False,
                          output_size=H_SIZE,
                          debug=False)(in_bert)
-
-l_drop = layers.Dropout(rate=0.5)(l_bert)
+l_drop = MCDropout(rate=0.5)(l_bert)
 out_pred = layers.Dense(num_classes, activation="softmax")(l_drop)
 
 model = tf.keras.models.Model(inputs=in_bert, outputs=out_pred)
@@ -147,14 +151,14 @@ log = model.fit([train_input_ids, train_input_masks, train_segment_ids],
                 train_labels, validation_data=test_set,
                 workers=4, use_multiprocessing=True,
                 verbose=2, callbacks=callbacks_list,
-                epochs=1000, batch_size=32)
+                epochs=1000, batch_size=56)
 
-[eval_loss, eval_acc] = model.evaluate([test_input_ids, test_input_masks, test_segment_ids], test_labels, verbose=2, batch_size=112)
+[eval_loss, eval_acc] = model.evaluate([test_input_ids, test_input_masks, test_segment_ids], test_labels, verbose=2, batch_size=256)
 
 print("Loss:", eval_loss, "Acc:", eval_acc)
 
 print("PHASE 2:")
-print("Load and label whole dataset")
+print("Load whole dataset")
 
 train_text, train_label, num_classes = utils.load_ag_news_dataset(max_seq_len=MAX_SEQ_LEN,
                                                                   test=False)
@@ -191,17 +195,79 @@ callbacks_list = [lr_schedule, early_stop]
 for i in range(5):
     print("\nIteration " + str(i) + " :\n")
 
-    y_pred = model.predict([train_input_ids, train_input_masks, train_segment_ids], verbose=2, batch_size=112)
-    y_pred_class = np.argmax(y_pred, axis=1)
-    y_pred_class = y_pred_class.reshape(y_pred_class.shape[0], 1)
+    print("Generating predictions with MCDropout")
+    y_pred_list = []
+    for _ in tqdm(range(10)):
+        y_pred = model.predict([train_input_ids, train_input_masks, train_segment_ids], verbose=2, batch_size=256)
+        y_pred_class = np.argmax(y_pred, axis=1)
+        y_pred_list.append(y_pred_class)
+    agg_y_pred = np.stack(y_pred_list, axis=-1)
+    
+    # try to find wrong predictions
+    acc = 0
+    wrong = 0
+    corr_guess = 0
+    false_pos = 0
+    false_neg = 0
+    for i, truth in tqdm(enumerate(train_label), total=len(train_label)):
+        pred = agg_y_pred[i, :]
+        m = stats.mode(pred).mode
+        correct = truth==m
+        diff = 0
+        for item in pred:
+            if item != m:
+                diff += 1
+        if diff > 5:
+            same = False
+        else:
+            same = True
+        if correct and same:
+            # correct guess as correct
+            acc += 1
+        if correct and not same:
+            # wrong guess as wrong
+            false_pos += 1
+            wrong += 1
+        if not correct and same:
+            # wrong guess as correct
+            false_neg += 1
+            wrong += 1
+        if not correct and not same:
+            # correct guess as wrong
+            corr_guess += 1
+            acc += 1
+    print("Correct guesses:", acc)
+    print("Wrong guesses:", wrong, ";", round(wrong/len(train_label)*100,1), "%")
+    print("Correct guess as wrong:", corr_guess)
+    print("Wrong guess as wrong:", false_pos)
+    print("Total labels for human:", corr_guess+false_pos)
+    
+    # generate fixed labels
+    y_pred_fixed = []
+    for i in range(len(train_label)):
+        pred = agg_y_pred[i, :]
+        m = stats.mode(pred).mode
+        diff = 0
+        for item in pred:
+            if item != m:
+                diff += 1
+        if diff > 5:
+            same = False
+        else:
+            same = True
+        if same:
+            y_pred_fixed.append(m)
+        else:
+            y_pred_fixed.append(train_label[i])
+    y_pred_fixed = np.asarray(y_pred_fixed)
 
     log = model.fit([train_input_ids, train_input_masks, train_segment_ids],
-                    y_pred_class, validation_data=test_set,
+                    y_pred_fixed, validation_data=test_set,
                     workers=4, use_multiprocessing=True,
                     verbose=2, callbacks=callbacks_list,
-                    epochs=50, batch_size=32)
+                    epochs=50, batch_size=56)
 
-    [eval_loss, eval_acc] = model.evaluate([test_input_ids, test_input_masks, test_segment_ids], test_labels, verbose=2, batch_size=112)
+    [eval_loss, eval_acc] = model.evaluate([test_input_ids, test_input_masks, test_segment_ids], test_labels, verbose=2, batch_size=256)
 
     print("Loss:", eval_loss, "Acc:", eval_acc)
 
