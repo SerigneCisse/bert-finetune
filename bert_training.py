@@ -217,7 +217,7 @@ for i in range(5):
         for item in pred:
             if item != m:
                 diff += 1
-        if diff > 5:
+        if diff > max(1,(5-i)):
             same = False
         else:
             same = True
