@@ -14,4 +14,4 @@ mpirun -np $N_GPU -H localhost:$N_GPU \
     -mca pml ob1 -mca btl ^openib \
     python3 dbpedia_classification.py \
     --xla --amp --sparse_as_dense --fp16_allreduce \
-    --epochs 4 --lr "0.00001" --radam
+    --epochs 4 --lr "0.00001"

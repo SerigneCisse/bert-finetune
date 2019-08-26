@@ -2,7 +2,7 @@
 
 echo -e "\n[INFO ] Caching Data\n"
 
-python3 cache_data.py --agnews --bertbase
+python3 cache_data.py --bertbase
 
 echo -e "\n[INFO ] Running on $N_GPU GPUs!\n"
 

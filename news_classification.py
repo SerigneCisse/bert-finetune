@@ -201,6 +201,7 @@ else:
     print_progress = False
     
 train_text, train_label, num_classes = utils.load_ag_news_dataset(max_seq_len=MAX_SEQ_LEN,
+                                                                  suffix=str(hvd.rank()),
                                                                   test=False)
 
 # load, preprocess and save data to pickle
@@ -228,6 +229,8 @@ train_input_ids, train_input_masks, train_segment_ids, train_labels = shuffle(tr
                                                                               train_input_masks,
                                                                               train_segment_ids,
                                                                               train_labels)
+num_items = len(train_labels)
+print("Number of training examples:", num_items)
 
 if args.dev:
     # for quicker testing during development, we reduce the dataset size
@@ -255,6 +258,7 @@ if test_feat.is_file():
     feat = pickle.load(open(test_feat_cache, "rb"))
 else:
     examples, labels, num_classes = utils.load_ag_news_dataset(max_seq_len=MAX_SEQ_LEN,
+                                                               suffix=str(hvd.rank()),
                                                                test=True)
     examples, labels = utils.shard_dataset(examples, labels, hvd)
     labels = np.asarray(labels)
@@ -379,7 +383,7 @@ else:
 if not args.profiling:
     callbacks = [
         # average metrics among workers after every epoch
-        hvd_keras.callbacks.MetricAverageCallback(),
+        #hvd_keras.callbacks.MetricAverageCallback(),
         hvd_keras.callbacks.LearningRateWarmupCallback(warmup_epochs=1, verbose=verbose),
         hvd_keras.callbacks.LearningRateScheduleCallback(start_epoch=1, end_epoch=10,
                                                          staircase=True,

@@ -200,8 +200,6 @@ if hvd.rank() == 0:
 else:
     print_progress = False
 
-time.sleep(hvd.rank())
-
 train_text, train_label, num_classes = utils.load_dbpedia_dataset(max_seq_len=MAX_SEQ_LEN,
                                                                   suffix=str(hvd.rank()),
                                                                   test=False)
@@ -231,6 +229,9 @@ train_input_ids, train_input_masks, train_segment_ids, train_labels = shuffle(tr
                                                                               train_input_masks,
                                                                               train_segment_ids,
                                                                               train_labels)
+
+num_items = len(train_labels)
+print("Number of training examples:", num_items)
 
 if args.dev:
     # for quicker testing during development, we reduce the dataset size
@@ -383,7 +384,7 @@ else:
 if not args.profiling:
     callbacks = [
         # average metrics among workers after every epoch
-        hvd_keras.callbacks.MetricAverageCallback(),
+        #hvd_keras.callbacks.MetricAverageCallback(),
         hvd_keras.callbacks.LearningRateWarmupCallback(warmup_epochs=1, verbose=verbose),
         hvd_keras.callbacks.LearningRateScheduleCallback(start_epoch=1, end_epoch=10,
                                                          staircase=True,
@@ -406,7 +407,7 @@ non_train_end = time.time()
 train_start_time = time.time()
 
 log = model.fit([train_input_ids, train_input_masks, train_segment_ids],
-                train_labels, validation_data=test_set,
+                train_labels, validation_split=0.05,
                 workers=4, use_multiprocessing=True,
                 verbose=verbose, callbacks=callbacks,
                 epochs=N_EPOCHS, batch_size=BATCH_SIZE)
