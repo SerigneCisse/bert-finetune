@@ -4,7 +4,7 @@ from tqdm import tqdm
 import tensorflow.compat.v1 as tf
 import tensorflow_hub as hub
 
-from bert.tokenization import FullTokenizer
+from .tokenization import FullTokenizer
 
 
 class BERT(tf.keras.layers.Layer):
@@ -283,3 +283,12 @@ def convert_text_to_examples(texts, labels):
                                           text_b=None,
                                           label=label))
     return InputExamples
+
+def convert_text_to_features(tokenizer, examples, labels, max_seq_length=512, verbose=False):
+    """Converts input text into features suitable for input into BERT model"""
+    examples_ = convert_text_to_examples(examples, labels)
+    features = convert_examples_to_features(tokenizer,
+                                            examples_,
+                                            max_seq_length=max_seq_length,
+                                            verbose=verbose)
+    return features

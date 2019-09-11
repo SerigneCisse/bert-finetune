@@ -40,11 +40,11 @@ else:
 sess = tf.Session()
 tf.keras.backend.set_session(sess)
 
-# ### Create Tokenizer
+# Create Tokenizer
 
 tokenizer = bert.model.create_tokenizer_from_hub_module(BERT_PATH, sess)
 
-# ### Preprocess Data
+# Preprocess Data
 
 train_text, train_label, num_classes = bert.utils.load_ag_news_dataset(max_seq_len=MAX_SEQ_LEN,
                                                                        test=False)
@@ -56,13 +56,7 @@ else:
     num_examples = len(train_label)
 
 train_label = np.asarray(train_label)
-train_examples = bert.model.convert_text_to_examples(train_text, train_label)
-
-feat = bert.model.convert_examples_to_features(tokenizer,
-                                               train_examples,
-                                               max_seq_length=MAX_SEQ_LEN,
-                                               verbose=False)
-
+feat = bert.model.convert_text_to_features(tokenizer, train_text, train_label, max_seq_length=MAX_SEQ_LEN, verbose=False)
 (train_input_ids, train_input_masks, train_segment_ids, train_labels) = feat
 
 print("Number of training examples:", len(train_labels))
@@ -70,12 +64,7 @@ print("Number of training examples:", len(train_labels))
 examples, labels, num_classes = bert.utils.load_ag_news_dataset(max_seq_len=MAX_SEQ_LEN,
                                                                 test=True)
 labels = np.asarray(labels)
-test_examples = bert.model.convert_text_to_examples(examples, labels)
-feat = bert.model.convert_examples_to_features(tokenizer,
-                                               test_examples,
-                                               max_seq_length=MAX_SEQ_LEN,
-                                               verbose=False)
-
+feat = bert.model.convert_text_to_features(tokenizer, examples, labels, max_seq_length=MAX_SEQ_LEN, verbose=False)
 (test_input_ids, test_input_masks, test_segment_ids, test_labels) = feat
 
 test_input_ids, test_input_masks, test_segment_ids, test_labels = shuffle(test_input_ids,
@@ -85,7 +74,7 @@ test_input_ids, test_input_masks, test_segment_ids, test_labels = shuffle(test_i
 
 test_set = ([test_input_ids, test_input_masks, test_segment_ids], test_labels)
 
-# ## Build Keras Model
+# Build Keras Model
 
 class MCDropout(tf.keras.layers.Dropout):
     def call(self, inputs):
@@ -127,7 +116,6 @@ def create_model():
     if USE_AMP:
         opt = tf.keras.mixed_precision.experimental.LossScaleOptimizer(opt, "dynamic")
 
-
     model.compile(loss="sparse_categorical_crossentropy",
                   optimizer=opt,
                   metrics=["accuracy"])
@@ -138,7 +126,7 @@ def create_model():
     
 model = create_model()
 
-# ## Train Model
+# Train Model
 
 def scheduler(epoch):
     warmup_steps = 26000
@@ -159,7 +147,7 @@ print("Train on 'golden' portion of dataset")
 log = model.fit([train_input_ids, train_input_masks, train_segment_ids],
                 train_labels, validation_data=test_set,
                 verbose=2, callbacks=callbacks_list,
-                epochs=1000, batch_size=BATCH_SIZE)
+                epochs=1, batch_size=BATCH_SIZE)
 
 [eval_loss, eval_acc] = model.evaluate([test_input_ids, test_input_masks, test_segment_ids], test_labels, verbose=2, batch_size=320)
 
@@ -172,28 +160,13 @@ train_text, train_label, num_classes = bert.utils.load_ag_news_dataset(max_seq_l
                                                                   test=False)
 
 train_label = np.asarray(train_label)
-train_examples = bert.model.convert_text_to_examples(train_text, train_label)
-
-feat = bert.model.convert_examples_to_features(tokenizer,
-                                               train_examples,
-                                               max_seq_length=MAX_SEQ_LEN,
-                                               verbose=False)
-
+feat = bert.model.convert_text_to_features(tokenizer, train_text, train_label, max_seq_length=MAX_SEQ_LEN, verbose=False)
 (train_input_ids, train_input_masks, train_segment_ids, train_labels) = feat
-
-"""
-len_list = []
-for example_mask in train_input_masks.tolist():
-    len_list.append(np.sum(example_mask))
-print(stats.describe(np.asarray(len_list)))
-"""
 
 print("Number of training examples:", len(train_labels))
 
 print("PHASE 3:")
 print("Train model on labelled dataset")
-
-#LEARNING_RATE = 5e-6
 
 def scheduler_2(epoch):
     warmup_epochs = 1
