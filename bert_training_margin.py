@@ -1,4 +1,5 @@
 import os
+import copy
 from pathlib import Path
 import pickle
 import multiprocessing
@@ -19,14 +20,16 @@ import bert.model
 import bert.utils
 import bert.optimizer
 
-BERTLARGE     = False
-USE_AMP       = True
-USE_XLA       = True
-MAX_SEQ_LEN   = 128
-LEARNING_RATE = 1e-5
-TUNE_LAYERS   = -1
-DROPOUT_RATE  = 0.5
-BATCH_SIZE    = 48
+BERTLARGE      = False
+USE_AMP        = True
+USE_XLA        = True
+MAX_SEQ_LEN    = 128
+LEARNING_RATE  = 1e-5
+TUNE_LAYERS    = -1
+DROPOUT_RATE   = 0.5
+BATCH_SIZE     = 48
+EVAL_BATCHSIZE = 256
+VAL_FREQ       = 3
 
 DATASET_PORTION = float(os.environ["DATASET_PORTION"])
 
@@ -54,8 +57,10 @@ if DATASET_PORTION < 1:
     _, train_text, _, train_label= train_test_split(train_text, train_label, test_size=DATASET_PORTION, stratify=train_label)
 else:
     num_examples = len(train_label)
+    
+golden_dataset = (train_text, train_label)
 
-train_label = np.asarray(train_label)
+#train_label = np.asarray(train_label)
 feat = bert.model.convert_text_to_features(tokenizer, train_text, train_label, max_seq_length=MAX_SEQ_LEN, verbose=False)
 (train_input_ids, train_input_masks, train_segment_ids, train_labels) = feat
 
@@ -63,23 +68,14 @@ print("Number of training examples:", len(train_labels))
 
 examples, labels, num_classes = bert.utils.load_ag_news_dataset(max_seq_len=MAX_SEQ_LEN,
                                                                 test=True)
-labels = np.asarray(labels)
+#labels = np.asarray(labels)
 feat = bert.model.convert_text_to_features(tokenizer, examples, labels, max_seq_length=MAX_SEQ_LEN, verbose=False)
 (test_input_ids, test_input_masks, test_segment_ids, test_labels) = feat
-
-test_input_ids, test_input_masks, test_segment_ids, test_labels = shuffle(test_input_ids,
-                                                                          test_input_masks,
-                                                                          test_segment_ids,
-                                                                          test_labels)
 
 test_set = ([test_input_ids, test_input_masks, test_segment_ids], test_labels)
 
 # Build Keras Model
 
-class MCDropout(tf.keras.layers.Dropout):
-    def call(self, inputs):
-        return super().call(inputs, training=True)
-    
 def create_model():
     tf.keras.backend.clear_session()
     config = tf.ConfigProto()
@@ -103,11 +99,15 @@ def create_model():
     in_bert = [in_id, in_mask, in_segment]
     l_bert = bert.model.BERT(fine_tune_layers=TUNE_LAYERS,
                              bert_path=BERT_PATH,
-                             return_sequence=False,
+                             return_sequence=True,
                              output_size=H_SIZE,
                              debug=False)(in_bert)
-    l_drop = MCDropout(rate=DROPOUT_RATE)(l_bert)
-    out_pred = layers.Dense(num_classes, activation="softmax")(l_drop)
+    l_bert = layers.Reshape((MAX_SEQ_LEN, H_SIZE))(l_bert)
+    l_drop_1 = layers.SpatialDropout1D(rate=DROPOUT_RATE)(l_bert)
+    l_conv = layers.Conv1D(H_SIZE//2, 1)(l_drop_1)
+    l_flat = layers.Flatten()(l_conv)
+    l_drop_2 = layers.Dropout(rate=DROPOUT_RATE)(l_flat)
+    out_pred = layers.Dense(num_classes, activation="softmax")(l_drop_2)
 
     model = tf.keras.models.Model(inputs=in_bert, outputs=out_pred)
 
@@ -129,7 +129,7 @@ model = create_model()
 # Train Model
 
 def scheduler(epoch):
-    warmup_steps = 26000
+    warmup_steps = 30000
     warmup_epochs = warmup_steps//num_examples
     if epoch < warmup_epochs:
         return LEARNING_RATE*(epoch/warmup_epochs)
@@ -146,10 +146,10 @@ print("Train on 'golden' portion of dataset")
 
 log = model.fit([train_input_ids, train_input_masks, train_segment_ids],
                 train_labels, validation_data=test_set,
-                verbose=2, callbacks=callbacks_list,
-                epochs=1, batch_size=BATCH_SIZE)
+                validation_freq=VAL_FREQ, verbose=2, callbacks=callbacks_list,
+                epochs=1000, batch_size=BATCH_SIZE)
 
-[eval_loss, eval_acc] = model.evaluate([test_input_ids, test_input_masks, test_segment_ids], test_labels, verbose=2, batch_size=320)
+[eval_loss, eval_acc] = model.evaluate([test_input_ids, test_input_masks, test_segment_ids], test_labels, verbose=2, batch_size=EVAL_BATCHSIZE)
 
 print("Loss:", eval_loss, "Acc:", eval_acc)
 
@@ -157,9 +157,9 @@ print("PHASE 2:")
 print("Load whole dataset")
 
 train_text, train_label, num_classes = bert.utils.load_ag_news_dataset(max_seq_len=MAX_SEQ_LEN,
-                                                                  test=False)
+                                                                       test=False)
 
-train_label = np.asarray(train_label)
+#train_label = np.asarray(train_label)
 feat = bert.model.convert_text_to_features(tokenizer, train_text, train_label, max_seq_length=MAX_SEQ_LEN, verbose=False)
 (train_input_ids, train_input_masks, train_segment_ids, train_labels) = feat
 
@@ -168,100 +168,110 @@ print("Number of training examples:", len(train_labels))
 print("PHASE 3:")
 print("Train model on labelled dataset")
 
-def scheduler_2(epoch):
-    warmup_epochs = 1
-    if epoch < warmup_epochs:
-        return LEARNING_RATE*(epoch/warmup_epochs)
-    else:
-        return LEARNING_RATE/epoch
-
-lr_schedule = tf.keras.callbacks.LearningRateScheduler(scheduler_2)
 early_stop = tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=3, restore_best_weights=True)
 
-callbacks_list = [lr_schedule, early_stop]
+relabel_iterations = 5
+num_pred_iterations = 10
+threshold = 0.3
 
-for i in range(5):
-    print("\nIteration " + str(i) + " :\n")
+for i in range(relabel_iterations):
+    print("\nIteration ", i+1, "of", relabel_iterations, "iterations:\n")
 
-    print("Generating predictions with MCDropout")
-    y_pred_list = []
-    for _ in tqdm(range(10)):
-        y_pred = model.predict([train_input_ids, train_input_masks, train_segment_ids], verbose=2, batch_size=320)
-        y_pred_class = np.argmax(y_pred, axis=1)
-        y_pred_list.append(y_pred_class)
-    agg_y_pred = np.stack(y_pred_list, axis=-1)
+    print("Generating predictions with Dropout")
+    y_softmax_list = []
+    for _ in range(num_pred_iterations):
+        with tf.keras.backend.learning_phase_scope(1):
+            y_pred = model.predict([train_input_ids, train_input_masks, train_segment_ids], verbose=2, batch_size=EVAL_BATCHSIZE)
+        y_softmax_list.append(y_pred)
     
-    threshold = 5-i
+    agg_y_softmax = np.stack(y_softmax_list, axis=-2)
+    probs = np.sum(agg_y_softmax, axis=1)/num_pred_iterations
+    probs = probs.tolist()
+
+    margin_list = []
+
+    false_positive = 0
+    positive = 0
     
-    # try to find wrong predictions
-    acc = 0
-    wrong = 0
-    corr_guess = 0
-    false_pos = 0
-    false_neg = 0
-    for i, truth in tqdm(enumerate(train_label), total=len(train_label)):
-        pred = agg_y_pred[i, :]
-        m = stats.mode(pred).mode
-        correct = truth==m
-        diff = 0
-        for item in pred:
-            if item != m:
-                diff += 1
-        if diff > threshold:
-            same = False
+    try:
+        train_label_ = golden_dataset[1].tolist()
+    except Exception as e:
+        print("Ignoring error:", e)
+    try:
+        train_text_ = golden_dataset[0].tolist()
+    except Exception as e:
+        print("Ignoring error:", e)
+
+    for i, prob in enumerate(probs):
+        # margin: top_pred - (top-1)_pred
+        copy_prob = copy.deepcopy(prob)
+        copy_prob.sort()
+        margin = copy_prob[-1] - copy_prob[0]
+        if margin < threshold:
+            # for our own scoring purpose
+            margin_list.append(margin)
+            pred = np.argmax(prob)
+            if pred == train_label[i]:
+                false_positive += 1
+            else:
+                positive += 1
+            # add corrected example into golden dataset
+            if train_text[i] not in train_text_:
+                train_text_.append(train_text[i])
+                train_label_.append(train_label[i])
+                
+    golden_dataset = (train_text_, train_label_)
+            
+    acc = []
+    for i, prob in enumerate(probs):
+        pred = np.argmax(prob)
+        if pred == train_label[i]:
+            acc.append(1)
         else:
-            same = True
-        if correct and same:
-            # correct guess as correct
-            acc += 1
-        if correct and not same:
-            # wrong guess as wrong
-            false_pos += 1
-            wrong += 1
-        if not correct and same:
-            # wrong guess as correct
-            false_neg += 1
-            wrong += 1
-        if not correct and not same:
-            # correct guess as wrong
-            corr_guess += 1
-            acc += 1
-    print("Correct guesses:", acc)
-    print("Wrong guesses:", wrong, ";", round(wrong/len(train_label)*100,1), "%")
-    print("Correct guess as wrong:", corr_guess)
-    print("Wrong guess as wrong:", false_pos)
-    print("Total labels for human:", corr_guess+false_pos)
+            acc.append(0)
+    acc = sum(acc)/len(probs)
+
+    print("Threshold <", threshold)
+    print("Correct wrong:", positive)
+    print("Incorrect wrong:", false_positive)
+    print("Useful effort:", positive/(positive+false_positive))
+    print("Overall accuracy:", acc)
     
-    print("\nGenerating corrected labels\n")
-    y_pred_fixed = []
-    for i in range(len(train_label)):
-        pred = agg_y_pred[i, :]
-        m = stats.mode(pred).mode
-        diff = 0
-        for item in pred:
-            if item != m:
-                diff += 1
-        if diff > threshold:
-            same = False
-        else:
-            same = True
-        if same:
-            y_pred_fixed.append(m)
-        else:
-            y_pred_fixed.append(train_label[i])
-    y_pred_fixed = np.asarray(y_pred_fixed)
+    # regenerate dataset
     
-    print("\nCreate new copy of model\n")
+    train_text_, train_label_ = golden_dataset[0], golden_dataset[1]
+    
+    num_examples = len(train_label_)
+
+    #train_label_ = np.asarray(train_label_)
+    feat = bert.model.convert_text_to_features(tokenizer, train_text_, train_label_, max_seq_length=MAX_SEQ_LEN, verbose=False)
+    (train_input_ids_, train_input_masks_, train_segment_ids_, train_labels_) = feat
+    
     model = create_model()
+    
+    def scheduler_2(epoch):
+        warmup_steps = 30000
+        warmup_epochs = warmup_steps//num_examples
+        if epoch < warmup_epochs:
+            return LEARNING_RATE*(epoch/warmup_epochs)
+        else:
+            return LEARNING_RATE
 
-    print("\nTrain new model\n")
-    log = model.fit([train_input_ids, train_input_masks, train_segment_ids],
-                    y_pred_fixed, validation_data=test_set,
-                    verbose=2, callbacks=callbacks_list,
-                    epochs=50, batch_size=BATCH_SIZE)
-
-    [eval_loss, eval_acc] = model.evaluate([test_input_ids, test_input_masks, test_segment_ids], test_labels, verbose=2, batch_size=320)
+    lr_schedule = tf.keras.callbacks.LearningRateScheduler(scheduler_2)
+    callbacks_list = [lr_schedule, early_stop]
+    
+    # retrain model
+    log = model.fit([train_input_ids_, train_input_masks_, train_segment_ids_],
+                train_labels_, validation_data=test_set,
+                validation_freq=VAL_FREQ, verbose=2, callbacks=callbacks_list,
+                epochs=1000, batch_size=BATCH_SIZE)
+    
+    [eval_loss, eval_acc] = model.evaluate([test_input_ids, test_input_masks, test_segment_ids], test_labels, verbose=2, batch_size=EVAL_BATCHSIZE)
 
     print("Loss:", eval_loss, "Acc:", eval_acc)
+    
+    total_relabel = positive + false_positive
+    if total_relabel < 200:
+        threshold += 0.1
 
 print("End!")
