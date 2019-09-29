@@ -24,9 +24,9 @@ BERTLARGE      = False
 USE_AMP        = True
 USE_XLA        = True
 MAX_SEQ_LEN    = 128
-LEARNING_RATE  = 1e-5
+LEARNING_RATE  = 2e-5
 TUNE_LAYERS    = -1
-DROPOUT_RATE   = 0.5
+DROPOUT_RATE   = 0.9
 BATCH_SIZE     = 48
 EVAL_BATCHSIZE = 256
 VAL_FREQ       = 3
@@ -103,7 +103,7 @@ def create_model():
                              output_size=H_SIZE,
                              debug=False)(in_bert)
     l_bert = layers.Reshape((MAX_SEQ_LEN, H_SIZE))(l_bert)
-    l_drop_1 = layers.SpatialDropout1D(rate=DROPOUT_RATE)(l_bert)
+    l_drop_1 = layers.SpatialDropout1D(rate=DROPOUT_RATE/2)(l_bert)
     l_conv = layers.Conv1D(H_SIZE//2, 1)(l_drop_1)
     l_flat = layers.Flatten()(l_conv)
     l_drop_2 = layers.Dropout(rate=DROPOUT_RATE)(l_flat)
