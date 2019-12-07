@@ -1,3 +1,5 @@
+Note: this project has been archived.
+
 # Fine-tuning BERT
 
 ![header](images/bert_header.jpg)
